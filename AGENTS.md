@@ -10,7 +10,25 @@ Antes de escribir cualquier línea de código, lee en este orden:
 1. `IDEA.md` — visión completa del producto
 2. `SKILL.md` — arquitectura, stack y reglas de código
 3. `PHASES.md` — en qué fase estamos y qué sigue
-4. Este archivo — cómo trabajar en este proyecto
+4. `avance.md` — último estado real del proyecto
+5. Este archivo — cómo trabajar en este proyecto
+
+---
+
+## CONFIGURACIÓN DEL AGENTE
+
+- **Modelo**: `google/gemini-2-5-flash`
+- **Working directory**: `C:\laragon\www\Carpia`
+- **OS**: Windows 11 con Laragon
+- **PHP**: 8.4 | **Laravel**: 12 | **Node**: via NVM
+
+---
+
+## ESTADO ACTUAL DE LA SESIÓN
+
+- **Fases completadas**: Fase 1, 2, 3 y 4 — proyecto base funcional
+- **Próxima tarea**: [ACTUALIZAR ESTO AL INICIO DE CADA SESIÓN]
+- **Último cambio**: Ver `avance.md` para el historial reciente
 
 ---
 
@@ -27,20 +45,18 @@ Antes de escribir cualquier línea de código, lee en este orden:
 
 ## REGLAS DE TRABAJO
 
-### 1. Trabaja por fases
-No implementes todo de golpe. Pregunta en qué fase estamos antes de empezar. Consulta `PHASES.md`.
+### 1. Lee antes de editar
+Antes de modificar cualquier archivo, léelo completo y muestra las líneas relevantes. Nunca edites a ciegas.
 
-### 2. Código completo y funcional
+### 2. Trabaja por tareas atómicas
+Una tarea a la vez. Confirma que funcionó antes de pasar a la siguiente.
+
+### 3. Código completo y funcional
 No generes stubs, no dejes `// TODO` sin implementar, no pongas `// lógica aquí`. Si algo requiere más contexto, pregunta antes.
 
-### 3. Sigue la arquitectura
-```
-Controllers → Services → DTOs → Models
-Livewire Components → Services (no directo a Models)
-AIManager → AIProvider (interfaz) → Provider concreto
-```
+### 4. Sigue la arquitectura
 
-### 4. Estilo de código
+### 5. Estilo de código
 - PHP: PSR-12
 - Clases: PascalCase
 - Métodos: camelCase
@@ -48,12 +64,12 @@ AIManager → AIProvider (interfaz) → Provider concreto
 - Sin lógica en Controllers
 - Sin lógica de negocio en Livewire (solo UI + llamada al Service)
 
-### 5. Base de datos
+### 6. Base de datos
 - Siempre soft deletes en conversations y messages
 - Siempre timestamps
 - Índices en: `user_id`, `conversation_id`, `model_id`, `created_at`
 
-### 6. Seguridad
+### 7. Seguridad
 - Usar Policies para autorización (`ConversationPolicy`, etc.)
 - Validar requests con Form Requests
 - Rate limiting en rutas de chat
@@ -64,37 +80,42 @@ AIManager → AIProvider (interfaz) → Provider concreto
 ## FLUJO DE TRABAJO ESPERADO
 
 Cuando el usuario pida implementar algo, tu flujo es:
+Leer avance.md para entender el estado actual
+Leer el archivo relevante antes de tocarlo
+Mostrar las líneas que se van a modificar
+Ejecutar el cambio
+Confirmar qué se hizo y qué sigue
 
-```
-1. Confirmar en qué fase estamos
-2. Leer SKILL.md si tienes dudas de arquitectura
-3. Crear/modificar migraciones si aplica
-4. Crear Model con relaciones y scopes
-5. Crear DTO si se transfieren datos entre capas
-6. Crear/modificar Service con la lógica
-7. Crear Controller delgado
-8. Crear componente Livewire
-9. Crear vista Blade con TailwindCSS (modo oscuro)
-10. Agregar rutas
-11. Agregar tests básicos con Pest
-```
+
+Para features nuevas:
+
+Crear/modificar migraciones si aplica
+Crear Model con relaciones y scopes
+Crear DTO si se transfieren datos entre capas
+Crear/modificar Service con la lógica
+Crear Controller delgado
+Crear componente Livewire
+Crear vista Blade con TailwindCSS (modo oscuro)
+Agregar rutas
+Agregar tests básicos con Pest
+
 
 ---
 
 ## ESTRUCTURA DE ARCHIVOS CLAVE
+app/AI/Contracts/AIProvider.php        ← NUNCA modificar la interfaz sin avisar
 
-```
-app/AI/Contracts/AIProvider.php     ← NUNCA modificar la interfaz sin avisar
-app/AI/AIManager.php                ← Aquí se resuelve el proveedor
-config/ai.php                       ← Config de todos los proveedores
+app/AI/AIManager.php                   ← Aquí se resuelve el proveedor
+
+config/ai.php                          ← Config de todos los proveedores
+
 resources/views/layouts/app.blade.php  ← Layout principal, tocar con cuidado
-```
+
+avance.md                              ← Actualizar después de cada sesión
 
 ---
 
 ## COMPONENTES LIVEWIRE EXISTENTES
-
-*(Actualizar esta lista a medida que se crean)*
 
 | Componente                      | Ruta                              | Función                        |
 |---------------------------------|-----------------------------------|--------------------------------|
@@ -108,26 +129,21 @@ resources/views/layouts/app.blade.php  ← Layout principal, tocar con cuidado
 ---
 
 ## PALETA DE COLORES (MODO OSCURO)
-
-```
 Fondo principal:    #0d0d0d
+
 Sidebar / Cards:    #161616
+
 Inputs / Hover:     #1e1e1e
+
 Bordes:             #2a2a2a
+
 Texto principal:    #f0f0f0
+
 Texto secundario:   #888888
+
 Acento (violeta):   #7c3aed
+
 Acento claro:       #a78bfa
-```
-
----
-
-## MODELOS DE IA — PRIORIDAD DE IMPLEMENTACIÓN
-
-1. **Groq** (primero — más fácil, muy rápido)
-2. **Gemini** (segundo — free tier generoso)
-3. **OpenRouter** (tercero — acceso a muchos modelos)
-4. Resto: Cloudflare, HuggingFace, Mistral, DeepSeek, Ollama
 
 ---
 
@@ -139,6 +155,8 @@ Acento claro:       #a78bfa
 ❌ No mezclar HTML y lógica PHP en Blade (usar componentes)
 ❌ No crear migraciones sin índices en foreign keys
 ❌ No olvidar `->middleware('auth')` en rutas protegidas
+❌ No editar archivos sin leerlos primero
+❌ No hacer múltiples cambios a la vez sin confirmar cada uno
 
 ---
 
@@ -147,8 +165,8 @@ Acento claro:       #a78bfa
 ```bash
 php artisan make:livewire NombreComponente
 php artisan make:model NombreModelo -mf
-php artisan make:service NombreService          # con el package correcto
-php artisan migrate:fresh --seed                 # reset completo en desarrollo
+php artisan make:service NombreService
+php artisan migrate:fresh --seed
 php artisan test --filter NombreTest
 php artisan optimize:clear
 npm run dev
@@ -158,6 +176,9 @@ npm run dev
 
 ## FASE ACTUAL
 
-**Ver PHASES.md para saber en qué fase estamos.**
+Todas las fases (1-4) están marcadas como completas en `PHASES.md`.
+El proyecto tiene chat funcional, multi-proveedor, biblioteca de prompts,
+favoritos, sistema de créditos y panel de administración.
 
-Al iniciar una sesión, pregunta: *"¿En qué tarea de la fase actual trabajamos hoy?"*
+**Al iniciar sesión NO preguntes en qué fase estamos.**
+Lee `avance.md` y pregunta: *"¿Qué mejoramos o escalamos hoy?"*

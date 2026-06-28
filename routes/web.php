@@ -12,17 +12,22 @@ Route::get('/offline', function () {
     return view('offline');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::get('/planes', function () {
     return view('planes');
 })->name('planes');
 
+Route::get('/dashboard', function () {
+    return view('chat', ['conversationId' => null]);
+})->middleware(['auth', 'verified'])->name('dashboard');
+
 Route::get('/chat', function () {
     return view('chat', ['conversationId' => null]);
 })->middleware(['auth', 'verified'])->name('chat');
+
+Route::get('/dashboard', function () {
+    return view('chat', ['conversationId' => null]);
+})->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::get('/chat/{conversationId}', function (int $conversationId) {
     return view('chat', ['conversationId' => $conversationId]);

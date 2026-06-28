@@ -28,14 +28,9 @@
                                 {{ __('Dashboard') }}
                             </a>
                         @else
-                            <a href="{{ route('login') }}" class="px-4 py-2 text-sm text-[#888888] hover:text-[#f0f0f0] transition-colors">
-                                {{ __('Iniciar sesión') }}
+                            <a href="{{ route('login') }}" class="px-4 py-2 text-sm bg-[#7c3aed] hover:bg-[#6d28d9] text-white rounded-lg transition-colors">
+                                {{ __('Comenzar') }}
                             </a>
-                            @if (Route::has('register'))
-                                <a href="{{ route('register') }}" class="px-4 py-2 text-sm bg-[#7c3aed] hover:bg-[#6d28d9] text-white rounded-lg transition-colors">
-                                    {{ __('Registrarse') }}
-                                </a>
-                            @endif
                         @endauth
                     @endif
                 </div>
