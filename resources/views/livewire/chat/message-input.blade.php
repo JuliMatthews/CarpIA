@@ -16,13 +16,13 @@
         </div>
     @endif
 
-    <form wire:submit.prevent="send" class="flex items-end gap-3">
+    <form wire:submit.prevent="send" class="flex items-center gap-1.5 px-3 py-2 bg-[#1e1e1e] border border-[#2a2a2a] rounded-xl has-[:focus]:border-[#7c3aed] has-[:focus]:ring-1 has-[:focus]:ring-[#7c3aed] transition-colors">
         {{-- File picker button --}}
-        <div class="relative">
+        <div class="relative flex-shrink-0">
             <button
                 type="button"
                 wire:click="$toggle('showFilePicker')"
-                class="p-3 bg-[#1e1e1e] border border-[#2a2a2a] rounded-xl text-[#888888] hover:text-[#a78bfa] hover:border-[#7c3aed] transition-colors"
+                class="w-8 h-8 flex items-center justify-center rounded-lg text-[#888888] hover:text-[#a78bfa] hover:bg-[#2a2a2a] transition-colors"
                 title="Adjuntar archivo"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -71,6 +71,8 @@
                             transcript += e.results[i][0].transcript;
                         }
                         $wire.$set('message', $wire.message + ' ' + transcript);
+                        const ta = document.getElementById('chat-textarea');
+                        if (ta) ta.dispatchEvent(new Event('input', { bubbles: true }));
                     };
 
                     recognition.onend = () => { listening = false; };
@@ -81,8 +83,8 @@
                 if (listening) { recognition.stop(); listening = false; }
                 else { recognition.start(); listening = true; }
             "
-            :class="listening ? 'bg-red-500 border-red-500 text-white' : 'bg-[#1e1e1e] border-[#2a2a2a] text-[#888888] hover:text-[#a78bfa]'"
-            class="p-3 border rounded-xl transition-colors"
+            :class="listening ? 'bg-red-500 text-white' : 'text-[#888888] hover:text-[#a78bfa] hover:bg-[#2a2a2a]'"
+            class="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-lg transition-colors"
             title="Dictado por voz"
         >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -91,29 +93,32 @@
         </button>
 
         {{-- Message textarea --}}
-        <div class="flex-1 relative">
+        <div class="flex-1 relative" x-data="{ hasText: false }">
             <textarea
                 wire:model.live="message"
                 id="chat-textarea"
-                placeholder="Escribe tu mensaje... (Enter para enviar, Shift+Enter para nueva línea)"
+                placeholder="Escribe tu mensaje..."
                 rows="1"
-                class="w-full px-4 py-3 pr-12 bg-[#1e1e1e] border border-[#2a2a2a] rounded-xl text-[#f0f0f0] placeholder-[#888888] focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] focus:outline-none resize-none"
+                x-on:input="hasText = $el.value.trim().length > 0"
+                class="w-full py-2 pr-10 bg-transparent text-[#f0f0f0] placeholder-[#888888] focus:outline-none resize-none"
             ></textarea>
+            {{-- Send button inside --}}
+            <button
+                type="submit"
+                id="send-btn"
+                wire:loading.attr="disabled"
+                x-bind:class="hasText ? 'bg-[#7c3aed] hover:bg-[#6d28d9]' : 'bg-[#555555]'"
+                class="absolute top-1/2 -translate-y-1/2 right-0 w-8 h-8 rounded-full text-white transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                <svg wire:loading.remove class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+                <svg wire:loading class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </button>
         </div>
-        <button
-            type="submit"
-            id="send-btn"
-            wire:loading.attr="disabled"
-            class="px-4 py-3 bg-[#7c3aed] hover:bg-[#6d28d9] disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white transition-colors flex items-center justify-center"
-        >
-            <svg wire:loading.remove class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
-            <svg wire:loading class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-        </button>
     </form>
 </div>
 
