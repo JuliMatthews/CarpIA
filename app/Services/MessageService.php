@@ -24,9 +24,9 @@ class MessageService
         ]);
     }
 
-    public function storeUserMessage(Conversation $conversation, string $content): Message
+    public function storeUserMessage(Conversation $conversation, string $content, ?array $metadata = null): Message
     {
-        return $this->store($conversation, 'user', $content);
+        return $this->store($conversation, 'user', $content, $metadata);
     }
 
     public function storeAssistantMessage(Conversation $conversation, string $content, ?int $tokens = null, ?int $responseTimeMs = null, ?string $model = null): Message

@@ -8,9 +8,17 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('/offline', function () {
+    return view('offline');
+});
+
 Route::get('/dashboard', function () {
     return view('dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
+
+Route::get('/planes', function () {
+    return view('planes');
+})->name('planes');
 
 Route::get('/chat', function () {
     return view('chat', ['conversationId' => null]);
@@ -24,6 +32,35 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    Route::get('/chat/{conversation}/export/pdf', function (int $conversationId) {
+        $conversation = \App\Models\Conversation::with('messages')->findOrFail($conversationId);
+        abort_unless($conversation->user_id === auth()->id(), 403);
+
+        $modelName = $conversation->model?->name ?? 'Desconocido';
+        $html = view('exports.conversation-pdf', compact('conversation', 'modelName'))->render();
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html);
+        $title = $conversation->title ?? 'chat';
+        $filename = 'carpia-' . str_replace([' ', '/', '\\'], '-', $title) . '.pdf';
+
+        return response()->streamDownload(
+            fn() => print($pdf->output()),
+            $filename,
+            ['Content-Type' => 'application/pdf']
+        );
+    })->name('chat.export.pdf');
+
+    Route::post('/promo/redeem', function (\Illuminate\Http\Request $request) {
+        $request->validate(['code' => 'required|string|max:50']);
+        $service = new \App\Services\PromoCodeService();
+        $result = $service->redeem($request->code, auth()->user());
+
+        return redirect()->route('dashboard')->with(
+            $result['success'] ? 'success' : 'error',
+            $result['message']
+        );
+    })->name('promo.redeem');
 });
 
 // Admin routes
@@ -35,6 +72,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/models', [AdminController::class, 'models'])->name('models');
     Route::patch('/models/{model}/toggle', [AdminController::class, 'toggleModel'])->name('models.toggle');
     Route::get('/plans', [AdminController::class, 'plans'])->name('plans');
+    Route::get('/promo-codes', [AdminController::class, 'promoCodes'])->name('promo-codes');
+    Route::post('/promo-codes', [AdminController::class, 'storePromoCode'])->name('promo-codes.store');
+    Route::patch('/promo-codes/{promoCode}/toggle', [AdminController::class, 'togglePromoCode'])->name('promo-codes.toggle');
 });
 
 require __DIR__.'/auth.php';

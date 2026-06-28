@@ -39,6 +39,8 @@ class GoogleController extends Controller
             ]
         );
 
+        $user->update(['last_login_at' => now()]);
+
         Auth::login($user, remember: true);
 
         return redirect()->intended(route('dashboard'));

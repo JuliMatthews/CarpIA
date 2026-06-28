@@ -7,6 +7,7 @@ use App\Models\CreditTransaction;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\Plan;
+use App\Models\PromoCode;
 use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -53,7 +54,8 @@ class AdminController extends Controller
 
     public function users()
     {
-        $users = User::with('subscription.plan')
+        $users = User::with(['subscription.plan'])
+            ->withCount('conversations')
             ->latest()
             ->paginate(20);
 
@@ -62,7 +64,14 @@ class AdminController extends Controller
 
     public function user(User $user)
     {
-        $user->load(['conversations', 'creditTransactions', 'subscription.plan']);
+        $user->load([
+            'subscription.plan',
+            'creditTransactions' => fn($q) => $q->latest()->limit(20),
+            'conversations' => fn($q) => $q->with(['messages' => fn($q) => $q->latest()->limit(5)])
+                ->withCount('messages')
+                ->latest()
+                ->limit(20),
+        ]);
 
         $stats = [
             'total_conversations' => $user->conversations()->count(),
@@ -84,6 +93,37 @@ class AdminController extends Controller
         $user->update($validated);
 
         return redirect()->route('admin.user', $user)->with('success', 'Usuario actualizado.');
+    }
+
+    public function promoCodes()
+    {
+        $codes = PromoCode::withCount('redemptions')->latest()->paginate(20);
+
+        return view('admin.promo-codes', compact('codes'));
+    }
+
+    public function storePromoCode(Request $request)
+    {
+        $validated = $request->validate([
+            'code' => 'required|string|max:50|unique:promo_codes,code',
+            'description' => 'nullable|string|max:500',
+            'max_uses' => 'nullable|integer|min:1',
+            'expires_at' => 'nullable|date|after:now',
+            'duration_hours' => 'required|integer|min:1|max:720',
+        ]);
+
+        $validated['created_by'] = auth()->id();
+
+        PromoCode::create($validated);
+
+        return redirect()->route('admin.promo-codes')->with('success', 'Código promocional creado.');
+    }
+
+    public function togglePromoCode(PromoCode $promoCode)
+    {
+        $promoCode->update(['is_active' => !$promoCode->is_active]);
+
+        return redirect()->route('admin.promo-codes')->with('success', 'Estado del código actualizado.');
     }
 
     public function models()

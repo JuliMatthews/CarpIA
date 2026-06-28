@@ -3,6 +3,8 @@
 namespace App\Livewire\Chat;
 
 use App\Models\Conversation;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 class ExportChat extends Component
@@ -51,13 +53,58 @@ class ExportChat extends Component
     {
         $markdown = $this->exportMarkdown();
         $title = $this->conversation->title ?? 'chat';
-        $filename = 'carpia-' . slug($title) . '.md';
+        $filename = 'carpia-' . Str::slug($title) . '.md';
 
         $this->dispatch('downloadFile', [
             'filename' => $filename,
             'content' => base64_encode($markdown),
             'mime' => 'text/markdown',
         ]);
+    }
+
+    public function downloadTxt(): void
+    {
+        $markdown = $this->exportMarkdown();
+        $title = $this->conversation->title ?? 'chat';
+        $filename = 'carpia-' . slug($title) . '.txt';
+
+        $this->dispatch('downloadFile', [
+            'filename' => $filename,
+            'content' => base64_encode($markdown),
+            'mime' => 'text/plain',
+        ]);
+    }
+
+    public function downloadPdf()
+    {
+        if (!$this->conversation) {
+            return;
+        }
+
+        $conversation = $this->conversation;
+        $modelName = $conversation->model?->name ?? 'Desconocido';
+
+        $html = view('exports.conversation-pdf', compact('conversation', 'modelName'))->render();
+
+        $pdf = Pdf::loadHTML($html);
+        $title = $conversation->title ?? 'chat';
+        $filename = 'carpia-' . Str::slug($title) . '.pdf';
+
+        $this->dispatch('downloadFile', [
+            'filename' => $filename,
+            'content' => base64_encode($pdf->output()),
+            'mime' => 'application/pdf',
+        ]);
+    }
+
+    public function getShareUrl(): ?string
+    {
+        if (!$this->conversation) {
+            return null;
+        }
+
+        // TODO: implementar share links con tokens únicos
+        return null;
     }
 
     public function render()

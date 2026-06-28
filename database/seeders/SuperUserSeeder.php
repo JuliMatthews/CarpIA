@@ -7,16 +7,16 @@ use App\Models\UserSetting;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
-class UserSeeder extends Seeder
+class SuperUserSeeder extends Seeder
 {
     public function run(): void
     {
         $user = User::updateOrCreate(
-            ['email' => 'admin@carpia.cl'],
+            ['email' => 'ia.carpia.cl@gmail.com'],
             [
-                'name' => 'Admin CarpIA',
-                'password' => Hash::make('password'),
-                'credits' => 1000,
+                'name' => 'Super Admin CarpIA',
+                'password' => Hash::make('Xha6$.jLKky73'),
+                'credits' => 999999,
                 'plan' => 'pro',
                 'is_admin' => true,
             ]
@@ -28,7 +28,7 @@ class UserSeeder extends Seeder
                 'theme' => 'dark',
                 'language' => 'es',
                 'temperature' => 0.7,
-                'max_tokens' => 2048,
+                'max_tokens' => 4096,
             ]
         );
     }

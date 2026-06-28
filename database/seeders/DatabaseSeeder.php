@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
             AiModelSeeder::class,
             PlanSeeder::class,
             UserSeeder::class,
+            SuperUserSeeder::class,
         ]);
     }
 }

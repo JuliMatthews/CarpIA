@@ -6,26 +6,26 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class UserSetting extends Model
+class PromoCodeRedemption extends Model
 {
     use HasFactory;
 
     protected $fillable = [
+        'promo_code_id',
         'user_id',
-        'theme',
-        'language',
-        'default_model_id',
-        'temperature',
-        'max_tokens',
-        'system_prompt',
+        'granted_until',
     ];
 
     protected function casts(): array
     {
         return [
-            'temperature' => 'float',
-            'max_tokens' => 'integer',
+            'granted_until' => 'datetime',
         ];
+    }
+
+    public function promoCode(): BelongsTo
+    {
+        return $this->belongsTo(PromoCode::class);
     }
 
     public function user(): BelongsTo

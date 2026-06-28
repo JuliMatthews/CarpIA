@@ -22,6 +22,7 @@ class User extends Authenticatable
         'credits',
         'plan',
         'is_admin',
+        'promo_access_until',
     ];
 
     protected $hidden = [
@@ -33,10 +34,22 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'last_login_at' => 'datetime',
+            'promo_access_until' => 'datetime',
             'password' => 'hashed',
             'credits' => 'integer',
             'is_admin' => 'boolean',
         ];
+    }
+
+    public function hasActivePromoAccess(): bool
+    {
+        return $this->promo_access_until && $this->promo_access_until->isFuture();
+    }
+
+    public function promoRedemptions(): HasMany
+    {
+        return $this->hasMany(PromoCodeRedemption::class);
     }
 
     public function conversations(): HasMany

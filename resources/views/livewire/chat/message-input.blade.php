@@ -1,5 +1,96 @@
 <div>
-    <form wire:submit.prevent="send" class="flex items-end gap-4">
+    {{-- File preview --}}
+    @if(!empty($uploadedFiles))
+        <div class="flex flex-wrap gap-2 mb-3">
+            @foreach($uploadedFiles as $i => $file)
+                <div class="flex items-center gap-2 px-3 py-2 bg-[#1e1e1e] border border-[#2a2a2a] rounded-lg text-sm">
+                    <span>{{ $file['type'] === 'image' ? '🖼️' : ($file['type'] === 'pdf' ? '📄' : '📎') }}</span>
+                    <span class="text-[#f0f0f0] truncate max-w-[150px]">{{ $file['name'] }}</span>
+                    <button wire:click="removeFile({{ $i }})" class="text-[#888888] hover:text-red-400 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            @endforeach
+        </div>
+    @endif
+
+    <form wire:submit.prevent="send" class="flex items-end gap-3">
+        {{-- File picker button --}}
+        <div class="relative">
+            <button
+                type="button"
+                wire:click="$toggle('showFilePicker')"
+                class="p-3 bg-[#1e1e1e] border border-[#2a2a2a] rounded-xl text-[#888888] hover:text-[#a78bfa] hover:border-[#7c3aed] transition-colors"
+                title="Adjuntar archivo"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+            </button>
+
+            @if($showFilePicker)
+                <div class="absolute bottom-full left-0 mb-2 p-4 bg-[#161616] border border-[#2a2a2a] rounded-xl shadow-xl z-50 w-72">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-sm font-medium text-[#f0f0f0]">Adjuntar archivos</span>
+                        <button wire:click="$set('showFilePicker', false)" class="text-[#888888] hover:text-[#f0f0f0]">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    <input
+                        type="file"
+                        wire:model="files"
+                        multiple
+                        accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,.mp3,.mp4"
+                        class="block w-full text-sm text-[#888888] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#7c3aed] file:text-white hover:file:bg-[#6d28d9] file:cursor-pointer"
+                    >
+                    <p class="text-xs text-[#555555] mt-2">Imágenes, PDF, TXT, CSV, Office. Máx 20MB por archivo.</p>
+                    <div wire:loading wire:target="files" class="text-sm text-[#a78bfa] mt-2">Subiendo archivo...</div>
+                </div>
+            @endif
+        </div>
+
+        {{-- Mic button --}}
+        <button
+            type="button"
+            x-data="{ listening: false, recognition: null }"
+            x-init="
+                if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    recognition = new SpeechRecognition();
+                    recognition.lang = 'es-CL';
+                    recognition.continuous = false;
+                    recognition.interimResults = true;
+
+                    recognition.onresult = (e) => {
+                        let transcript = '';
+                        for (let i = e.resultIndex; i < e.results.length; i++) {
+                            transcript += e.results[i][0].transcript;
+                        }
+                        $wire.$set('message', $wire.message + ' ' + transcript);
+                    };
+
+                    recognition.onend = () => { listening = false; };
+                }
+            "
+            @click="
+                if (!recognition) { alert('Voz no soportada en este navegador'); return; }
+                if (listening) { recognition.stop(); listening = false; }
+                else { recognition.start(); listening = true; }
+            "
+            :class="listening ? 'bg-red-500 border-red-500 text-white' : 'bg-[#1e1e1e] border-[#2a2a2a] text-[#888888] hover:text-[#a78bfa]'"
+            class="p-3 border rounded-xl transition-colors"
+            title="Dictado por voz"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+        </button>
+
+        {{-- Message textarea --}}
         <div class="flex-1 relative">
             <textarea
                 wire:model.live="message"

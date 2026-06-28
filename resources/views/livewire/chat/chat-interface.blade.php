@@ -1,6 +1,12 @@
 <div
     x-data="{ messageSent: false }"
-    @message-sent.window="messageSent = !messageSent"
+    @message-sent.window="
+        messageSent = !messageSent;
+        $nextTick(() => {
+            const el = $el.querySelector('.messages-container');
+            if (el) el.scrollTop = el.scrollHeight;
+        });
+    "
     @copy-to-clipboard.window="
         navigator.clipboard.writeText($event.detail.content);
         showToast('Copiado al portapapeles');
@@ -33,25 +39,41 @@
 >
     {{-- Header de la conversación --}}
     <div class="flex items-center justify-between px-6 py-4 border-b border-[#2a2a2a]">
-        <div class="flex items-center gap-3">
-            <h2 class="text-lg font-medium text-[#f0f0f0]">
-                {{ $conversation?->title ?: 'Nueva conversación' }}
-            </h2>
-            <livewire:chat.model-selector :modelId="$selectedModelId" :key="'model-selector-' . ($conversation?->id ?? 'new')" />
-        </div>
-        <div class="flex items-center gap-2">
-            <livewire:chat.export-chat :conversation="$conversation" :key="'export-' . ($conversation?->id ?? 'new')" />
-            <button
-                wire:click="newConversation"
-                class="px-4 py-2 text-sm bg-[#1e1e1e] border border-[#2a2a2a] rounded-lg text-[#888888] hover:text-[#f0f0f0] hover:border-[#7c3aed] transition-colors"
-            >
-                Nueva conversación
-            </button>
+        <div class="max-w-3xl mx-auto flex items-center justify-between w-full">
+            <div class="flex items-center gap-3">
+                <h2 class="text-lg font-medium text-[#f0f0f0]">
+                    {{ $conversation?->title ?: 'Nueva conversación' }}
+                </h2>
+                <livewire:chat.model-selector :modelId="$selectedModelId" :key="'model-selector-' . ($conversation?->id ?? 'new')" />
+            </div>
+            <div class="flex items-center gap-2">
+                {{-- Web Search toggle --}}
+                <button
+                    wire:click="$toggle('searchWeb')"
+                    class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors
+                        {{ $searchWeb
+                            ? 'bg-[#7c3aed]/20 border-[#7c3aed] text-[#a78bfa]'
+                            : 'bg-[#1e1e1e] border-[#2a2a2a] text-[#888888] hover:text-[#f0f0f0]'
+                        }}"
+                >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Web
+                </button>
+                <livewire:chat.export-chat :conversation="$conversation" :key="'export-' . ($conversation?->id ?? 'new')" />
+                <button
+                    wire:click="newConversation"
+                    class="px-4 py-2 text-sm bg-[#1e1e1e] border border-[#2a2a2a] rounded-lg text-[#888888] hover:text-[#f0f0f0] hover:border-[#7c3aed] transition-colors"
+                >
+                    Nueva conversación
+                </button>
+            </div>
         </div>
     </div>
 
     {{-- Área de mensajes --}}
-    <div class="flex-1 overflow-y-auto px-6 py-4">
+    <div class="flex-1 overflow-y-auto px-6 py-4 messages-container">
         @if(empty($messages))
             {{-- Estado vacío --}}
             <div class="flex flex-col items-center justify-center h-full text-center">
@@ -95,7 +117,7 @@
             </div>
         @else
             {{-- Lista de mensajes --}}
-            <div class="space-y-6">
+            <div class="max-w-3xl mx-auto space-y-6">
                 @foreach($messages as $msg)
                     <div class="flex {{ $msg['role'] === 'user' ? 'justify-end' : 'justify-start' }}">
                         <div class="max-w-[80%] {{ $msg['role'] === 'user'
@@ -113,7 +135,30 @@
                                     @endif
                                 </div>
                             @endif
+                            @if(isset($msg['metadata']['files']) && count($msg['metadata']['files']) > 0)
+                                <div class="flex flex-wrap gap-2 mb-2">
+                                    @foreach($msg['metadata']['files'] as $file)
+                                        <span class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-[#1e1e1e] border border-[#2a2a2a] rounded">
+                                            <span>{{ $file['type'] === 'image' ? '🖼️' : '📎' }}</span>
+                                            {{ $file['name'] }}
+                                        </span>
+                                    @endforeach
+                                </div>
+                            @endif
                             <div class="text-sm whitespace-pre-wrap">{{ $msg['content'] }}</div>
+                            @if($msg['role'] === 'assistant' && !$loop->last)
+                                <div class="flex justify-end mt-1">
+                                    <button
+                                        wire:click="$dispatch('regenerateResponse')"
+                                        class="text-xs text-[#888888] hover:text-[#a78bfa] transition-colors"
+                                        title="Regenerar respuesta"
+                                    >
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            @endif
                         </div>
                     </div>
                 @endforeach
@@ -156,6 +201,8 @@
 
     {{-- Input del mensaje --}}
     <div class="border-t border-[#2a2a2a] px-6 py-4 bg-[#0d0d0d]">
-        <livewire:chat.message-input />
+        <div class="max-w-3xl mx-auto">
+            <livewire:chat.message-input />
+        </div>
     </div>
 </div>

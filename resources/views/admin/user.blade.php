@@ -71,7 +71,7 @@
                         <h3 class="text-lg font-medium text-[#f0f0f0] mb-4">Historial de créditos</h3>
 
                         <div class="space-y-2 max-h-64 overflow-y-auto">
-                            @forelse($user->creditTransactions->take(20) as $transaction)
+                            @forelse($user->creditTransactions as $transaction)
                                 <div class="flex items-center justify-between p-3 bg-[#1e1e1e] rounded-lg">
                                     <div>
                                         <div class="text-sm text-[#f0f0f0]">{{ $transaction->description }}</div>
@@ -85,6 +85,47 @@
                                 <div class="text-center py-4 text-sm text-[#888888]">Sin transacciones</div>
                             @endforelse
                         </div>
+                    </div>
+
+                    {{-- Conversation History --}}
+                    <div class="p-6 bg-[#161616] border border-[#2a2a2a] rounded-xl">
+                        <h3 class="text-lg font-medium text-[#f0f0f0] mb-4">Historial de conversaciones</h3>
+
+                        @forelse($user->conversations as $conversation)
+                            <div x-data="{ open: false }" class="mb-4 last:mb-0">
+                                <button @click="open = !open" class="w-full flex items-center justify-between p-3 bg-[#1e1e1e] hover:bg-[#2a2a2a] rounded-lg transition-colors text-left">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-sm text-[#f0f0f0] truncate">{{ $conversation->title ?: 'Sin título' }}</div>
+                                        <div class="text-xs text-[#888888] mt-0.5">
+                                            {{ $conversation->messages_count }} mensajes · {{ $conversation->created_at->format('d/m/Y H:i') }}
+                                        </div>
+                                    </div>
+                                    <svg class="w-4 h-4 text-[#888888] shrink-0 ml-2" :class="{'rotate-180': open}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+
+                                <div x-show="open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-2" class="mt-2 space-y-2 pl-4 border-l-2 border-[#2a2a2a]">
+                                    @forelse($conversation->messages as $msg)
+                                        <div class="p-3 bg-[#1e1e1e] rounded-lg">
+                                            <div class="flex items-center gap-2 mb-1">
+                                                <span class="text-xs font-medium {{ $msg->role === 'user' ? 'text-[#7c3aed]' : 'text-green-400' }}">
+                                                    {{ $msg->role === 'user' ? 'Usuario' : 'CarpIA' }}
+                                                </span>
+                                                @if($msg->tokens)
+                                                    <span class="text-[10px] text-[#888888]">{{ $msg->tokens }} tokens</span>
+                                                @endif
+                                            </div>
+                                            <div class="text-xs text-[#f0f0f0] line-clamp-3">{{ Str::limit($msg->content, 200) }}</div>
+                                        </div>
+                                    @empty
+                                        <div class="text-xs text-[#888888] py-2">Sin mensajes</div>
+                                    @endforelse
+                                </div>
+                            </div>
+                        @empty
+                            <div class="text-center py-4 text-sm text-[#888888]">Sin conversaciones</div>
+                        @endforelse
                     </div>
                 </div>
 

@@ -18,6 +18,8 @@ class ChatInterface extends Component
     public bool $isLoading = false;
     public ?int $selectedModelId = null;
     public string $streamedContent = '';
+    public string $lastUserMessage = '';
+    public bool $searchWeb = false;
 
     public function mount(?int $conversationId = null): void
     {
@@ -65,15 +67,41 @@ class ChatInterface extends Component
     }
 
     #[On('submitMessage')]
-    public function handleSendMessage(string $content): void
+    public function handleSendMessage(string $content, array $files = []): void
     {
-        \Log::info('ChatInterface: submitMessage received', ['content' => $content, 'model_id' => $this->selectedModelId]);
-        $this->processMessage($content);
+        \Log::info('ChatInterface: submitMessage received', ['content' => $content, 'model_id' => $this->selectedModelId, 'files' => $files]);
+        $this->processMessage($content, $files);
     }
 
-    public function processMessage(string $content): void
+    #[On('regenerateResponse')]
+    public function handleRegenerate(): void
     {
-        if (empty(trim($content))) {
+        if (empty($this->lastUserMessage) || !$this->conversation) {
+            return;
+        }
+
+        $lastAssistantMessage = collect($this->messages)
+            ->where('role', 'assistant')
+            ->last();
+
+        if ($lastAssistantMessage && isset($lastAssistantMessage['id'])) {
+            $messageService = app(MessageService::class);
+            $msg = \App\Models\Message::find($lastAssistantMessage['id']);
+            if ($msg) {
+                $msg->delete();
+            }
+            $this->messages = collect($this->messages)
+                ->reject(fn($m) => isset($m['id']) && $m['id'] === $lastAssistantMessage['id'])
+                ->values()
+                ->toArray();
+        }
+
+        $this->processMessage($this->lastUserMessage);
+    }
+
+    public function processMessage(string $content, array $files = []): void
+    {
+        if (empty(trim($content)) && empty($files)) {
             return;
         }
 
@@ -89,10 +117,41 @@ class ChatInterface extends Component
             );
         }
 
-        $userMessage = $messageService->storeUserMessage($this->conversation, $content);
+        $this->lastUserMessage = $content;
+
+        $fileMeta = !empty($files) ? ['files' => $files] : null;
+        $userMessage = $messageService->storeUserMessage($this->conversation, $content, $fileMeta);
         $this->messages[] = $userMessage->toArray();
 
         $aiMessages = $messageService->formatForAI($this->conversation);
+
+        $systemPrompt = $user->settings?->system_prompt;
+        if ($systemPrompt) {
+            array_unshift($aiMessages, ['role' => 'system', 'content' => $systemPrompt]);
+        }
+
+        if ($this->searchWeb && $content) {
+            try {
+                $searchService = app(\App\Services\WebSearchService::class);
+                $searchResults = $searchService->search($content);
+
+                if ($searchResults) {
+                    $injection = "Aquí hay información obtenida de una búsqueda en internet para responder la pregunta del usuario. "
+                               . "Usa esta información como contexto para tu respuesta:\n\n{$searchResults}";
+
+                    foreach (array_reverse($aiMessages) as $i => $msg) {
+                        if ($msg['role'] === 'user' && $msg['content'] === $content) {
+                            array_splice($aiMessages, count($aiMessages) - 1 - $i, 0, [
+                                ['role' => 'system', 'content' => $injection]
+                            ]);
+                            break;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Web search failed', ['error' => $e->getMessage()]);
+            }
+        }
 
         $this->isLoading = true;
         $this->streamedContent = '';
