@@ -15,8 +15,8 @@ return new class extends Migration
             $table->string('status'); // 'active', 'cancelled', 'expired', 'past_due'
             $table->string('payment_method')->nullable(); // 'mercadopago', 'transbank', 'manual'
             $table->string('external_id')->nullable(); // payment gateway ID
-            $table->timestamp('starts_at');
-            $table->timestamp('ends_at');
+            $table->timestamp('starts_at')->useCurrent();
+            $table->timestamp('ends_at')->nullable();
             $table->timestamp('cancelled_at')->nullable();
             $table->boolean('is_yearly')->default(false);
             $table->json('metadata')->nullable();
