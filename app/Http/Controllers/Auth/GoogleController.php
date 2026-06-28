@@ -56,7 +56,7 @@ class GoogleController extends Controller
 
         Auth::login($user, remember: true);
 
-        return response()->json(['redirect' => route('dashboard')]);
+        return response()->json(['redirect' => route('chat')]);
     }
 
     public function callback(): RedirectResponse
@@ -81,6 +81,6 @@ class GoogleController extends Controller
 
         Auth::login($user, remember: true);
 
-        return redirect()->intended(route('dashboard'));
+        return redirect()->intended(route('chat'));
     }
 }
