@@ -54,9 +54,9 @@
                                     </td>
                                     <td class="px-8 py-5">
                                         @if($hasPaid)
-                                            <span class="px-3 py-1.5 text-sm rounded bg-green-500/20 text-green-400">✅ Pagó</span>
+                                            <span class="px-2 py-1 text-xs rounded bg-green-500/20 text-green-400">✅ Pagó</span>
                                         @else
-                                            <span class="px-3 py-1.5 text-sm rounded bg-red-500/20 text-red-400">❌ No pagó</span>
+                                            <span class="px-2 py-1 text-xs rounded bg-red-500/20 text-red-400">❌ No pagó</span>
                                         @endif
                                     </td>
                                     <td class="px-8 py-5 text-base text-[#f0f0f0] font-medium">{{ number_format($user->credits) }}</td>
