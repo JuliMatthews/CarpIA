@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -18,8 +21,42 @@ class GoogleController extends Controller
         return Socialite::driver('google')
             ->stateless()
             ->scopes(['openid', 'email', 'profile'])
-            ->with(['response_mode' => 'form_post'])
             ->redirect();
+    }
+
+    public function callbackToken(Request $request): JsonResponse|RedirectResponse
+    {
+        $credential = $request->input('credential');
+
+        if (!$credential) {
+            return response()->json(['error' => 'No credential provided'], 400);
+        }
+
+        // Verify the ID token with Google
+        $response = Http::post('https://oauth2.googleapis.com/tokeninfo', [
+            'id_token' => $credential,
+        ]);
+
+        if (!$response->successful()) {
+            return response()->json(['error' => 'Invalid token'], 400);
+        }
+
+        $payload = $response->json();
+
+        $user = User::firstOrCreate(
+            ['email' => $payload['email']],
+            [
+                'name' => $payload['name'] ?? $payload['email'],
+                'password' => Hash::make(Str::random(32)),
+                'email_verified_at' => now(),
+            ]
+        );
+
+        $user->update(['last_login_at' => now()]);
+
+        Auth::login($user, remember: true);
+
+        return response()->json(['redirect' => route('dashboard')]);
     }
 
     public function callback(): RedirectResponse

@@ -35,12 +35,16 @@ Route::middleware('guest')->group(function () {
     Route::post('reset-password', [NewPasswordController::class, 'store'])
         ->name('password.store');
 
-    // Google OAuth
+    // Google OAuth (server-side redirect - puede ser bloqueado por ModSecurity)
     Route::get('/auth/google', [GoogleController::class, 'redirect'])
         ->name('google.redirect');
 
-    Route::match(['get', 'post'], '/auth/google/callback', [GoogleController::class, 'callback'])
+    Route::get('/auth/google/callback', [GoogleController::class, 'callback'])
         ->name('google.callback');
+
+    // Google OAuth (token via JS - evita ModSecurity)
+    Route::post('/auth/google/token', [GoogleController::class, 'callbackToken'])
+        ->name('google.token');
 });
 
 Route::middleware('auth')->group(function () {
