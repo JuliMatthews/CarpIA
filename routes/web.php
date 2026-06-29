@@ -12,26 +12,21 @@ Route::get('/offline', function () {
     return view('offline');
 });
 
-
 Route::get('/planes', function () {
     return view('planes');
 })->name('planes');
 
 Route::get('/dashboard', function () {
     return view('chat', ['conversationId' => null]);
-})->middleware(['auth', 'verified'])->name('dashboard');
+})->middleware(['auth', 'verified', 'subscription'])->name('dashboard');
 
 Route::get('/chat', function () {
     return view('chat', ['conversationId' => null]);
-})->middleware(['auth', 'verified'])->name('chat');
-
-Route::get('/dashboard', function () {
-    return view('chat', ['conversationId' => null]);
-})->middleware(['auth', 'verified'])->name('dashboard');
+})->middleware(['auth', 'verified', 'subscription'])->name('chat');
 
 Route::get('/chat/{conversationId}', function (int $conversationId) {
     return view('chat', ['conversationId' => $conversationId]);
-})->middleware(['auth', 'verified'])->name('chat.show');
+})->middleware(['auth', 'verified', 'subscription'])->name('chat.show');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -61,7 +56,7 @@ Route::middleware('auth')->group(function () {
         $service = new \App\Services\PromoCodeService();
         $result = $service->redeem($request->code, auth()->user());
 
-        return redirect()->route('dashboard')->with(
+        return redirect()->route('chat')->with(
             $result['success'] ? 'success' : 'error',
             $result['message']
         );
@@ -83,3 +78,6 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 });
 
 require __DIR__.'/auth.php';
+Route::get('/subscription/required', function () {
+    return view('subscription');
+})->middleware('auth')->name('subscription.required');

@@ -1,3 +1,6 @@
+@auth
+    <script>window.location.href = "{{ url('/dashboard') }}";</script>
+@endauth
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
     <head>
