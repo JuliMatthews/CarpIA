@@ -1,0 +1,51 @@
+<?php
+
+namespace App\Services;
+
+use Transbank\Webpay\WebpayPlus\Transaction;
+use Transbank\Webpay\Options;
+
+class TransbankService
+{
+    private Transaction $transaction;
+
+    public function __construct()
+    {
+        $environment = config('transbank.environment', Options::ENVIRONMENT_INTEGRATION);
+        
+        $option = new Options(
+            config('transbank.webpay.api_key'),
+            config('transbank.webpay.commerce_code'),
+            $environment
+        );
+
+        $this->transaction = new Transaction($option);
+    }
+
+    public function createTransaction(string $buyOrder, string $sessionId, int $amount, string $returnUrl): array
+    {
+        $response = $this->transaction->create($buyOrder, $sessionId, $amount, $returnUrl);
+
+        return [
+            'token' => $response->getToken(),
+            'url' => $response->getUrl(),
+        ];
+    }
+
+    public function commitTransaction(string $token): array
+    {
+        $response = $this->transaction->commit($token);
+
+        return [
+            'status' => $response->getStatus(),
+            'authorization_code' => $response->getAuthorizationCode(),
+            'amount' => $response->getAmount(),
+            'buy_order' => $response->getBuyOrder(),
+            'card_detail' => [
+                'card_number' => $response->getCardDetail()->getCardNumber(),
+            ],
+            'response_code' => $response->getResponseCode(),
+            'transaction_date' => $response->getTransactionDate(),
+        ];
+    }
+}

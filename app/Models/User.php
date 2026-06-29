@@ -23,6 +23,7 @@ class User extends Authenticatable
         'plan',
         'is_admin',
         'promo_access_until',
+        'used_share_trial',
     ];
 
     protected $hidden = [
@@ -36,6 +37,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'promo_access_until' => 'datetime',
+            'used_share_trial' => 'boolean',
             'password' => 'hashed',
             'credits' => 'integer',
             'is_admin' => 'boolean',
