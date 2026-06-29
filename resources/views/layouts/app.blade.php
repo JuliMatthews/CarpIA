@@ -2,7 +2,7 @@
     $userTheme = auth()->check() ? (auth()->user()->settings?->theme ?? 'dark') : 'dark';
 @endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}"
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark"
       class="{{ $userTheme }}"
       x-data="{ theme: '{{ $userTheme }}', sidebarOpen: window.innerWidth > 1024 }"
       x-init="
