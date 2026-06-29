@@ -72,12 +72,17 @@ Se han implementado funcionalidades clave para la plataforma SaaS de IA **CarpIA
 - Se instaló `transbank/transbank-sdk:^5.0` (SDK oficial de Transbank)
 - Se creó `config/transbank.php` con configuración de producción
 - Se creó `app/Services/TransbankService.php` - Wrapper del SDK (create + commit)
-- Se creó `app/Http/Controllers/PaymentController.php` - Controlador de checkout
+- Se creó `app/Http/Controllers/PaymentController.php` - Controlador de checkout con método `direct`
 - Se creó `app/Livewire/Chat/SubscriptionWall.php` - Componente con botón de pago
 - Se creó `resources/views/livewire/chat/subscription-wall.blade.php` - UI del muro
 - Se creó `resources/views/checkout/redirect.blade.php` - Formulario auto-submit a Webpay
-- Se agregaron rutas `/checkout/create` y `/checkout/return` en `routes/web.php`
-- **Estado actual:** Código listo para producción, pendiente obtener API Key de Transbank
+- Se agregaron rutas `/checkout/direct` (GET) y `/checkout/return` (GET) en `routes/web.php`
+- Se verificó autoloader de Composer (namespace `Transbank\` faltaba, se reinstaló el SDK)
+- Se corrigió buy_order: máximo 26 caracteres (formato `CARPIA` + ULID truncado)
+- Se corrigió config: `api_key` lee de `WEBPAY_SECRET`, `commerce_code` lee de `WEBPAY_KEY`
+- Botón verde "Obtener Suscripción" en dashboard lleva directo a `/checkout/direct`
+- **Sandbox probado:** Webpay carga correctamente, formulario de tarjeta funciona
+- **Producción:** Pendiente API Key real de Transbank (credenciales sandbox no sirven para cobros reales)
 
 ---
 
@@ -109,10 +114,13 @@ Se han implementado funcionalidades clave para la plataforma SaaS de IA **CarpIA
 | `bootstrap/app.php` | Modificado | Registro middleware |
 | `config/transbank.php` | Creado | Configuración Transbank |
 | `app/Services/TransbankService.php` | Creado | Wrapper SDK Transbank |
-| `app/Http/Controllers/PaymentController.php` | Creado | Controlador checkout |
+| `app/Http/Controllers/PaymentController.php` | Creado | Controlador checkout (create + return + direct) |
 | `app/Livewire/Chat/SubscriptionWall.php` | Modificado | Agregado botón Webpay |
 | `resources/views/livewire/chat/subscription-wall.blade.php` | Modificado | UI con planes y pago |
 | `resources/views/checkout/redirect.blade.php` | Creado | Auto-submit a Webpay |
+| `resources/views/subscription.blade.php` | Modificado | Botón verde a Webpay directo |
+| `resources/views/planes.blade.php` | Modificado | Precio $1.990, botón "Comenzar" |
+| `resources/views/livewire/chat/chat-interface.blade.php` | Modificado | Botón verde "Obtener Suscripción" funcional |
 | `.env` | Modificado | Credenciales Transbank |
 
 ---
@@ -137,12 +145,18 @@ php artisan migrate
 ### URGENTE - Integración Transbank
 - [x] Instalar SDK `transbank/transbank-sdk:^5.0`
 - [x] Crear `TransbankService` wrapper del SDK
-- [x] Crear `PaymentController` con create + return
+- [x] Crear `PaymentController` con create + return + direct
 - [x] Crear `SubscriptionWall` con botón de pago
-- [x] Agregar rutas de checkout
-- [x] Configurar `.env` con credenciales (producción)
-- [ ] **Obtener API Key de Transbank** (llamar a soporte: 600 638 6380)
-- [ ] Actualizar `WEBPAY_SECRET` en `.env` con API Key real
+- [x] Agregar ruta `/checkout/direct` (GET directo a Webpay)
+- [x] Configurar `.env` con credenciales sandbox
+- [x] Fix autoloader de Composer (namespace Transbank no se registraba)
+- [x] Fix buy_order maxlength (max 26 caracteres)
+- [x] Fix config (credenciales invertidas api_key/commerce_code)
+- [x] Botón verde "Obtener Suscripción" funcional en dashboard
+- [x] Sandbox probado: Webpay carga, formulario funciona
+- [ ] **Obtener API Key de Transbank** (form: https://form.typeform.com/to/ibXdg6Av)
+- [ ] Actualizar `WEBPAY_KEY` y `WEBPAY_SECRET` en `.env` producción con credenciales reales
+- [ ] Cambiar `TRANSBANK_ENV=production` en `.env` producción
 - [ ] Probar flujo completo de pago en producción
 - [ ] Configurar URL de retorno en portal de Transbank
 
@@ -180,9 +194,13 @@ php artisan migrate:fresh --seed
 
 ### Transbank Webpay Plus
 - **Código de comercio producción:** 53087507
-- **API Key:** Pendiente - obtener de Transbank (no visible en portal)
+- **API Key:** Pendiente - obtener de Transbank via form de validación
 - **URL retorno producción:** `https://carpia.cl/checkout/return`
 - **SDK instalado:** `transbank/transbank-sdk:^5.0`
-- **Flujo:** POST /checkout/create → Redirect Webpay → GET /checkout/return → Confirmar
+- **Flujo:** GET /checkout/direct → Redirect Webpay → GET /checkout/return → Confirmar
 - **Seguridad:** Nunca se guardan datos de tarjeta, todo maneja Transbank
 - **Documentación:** https://transbankdevelopers.cl/documentacion/webpay-plus
+- **Credenciales sandbox (testing):** commerce `597055555532`, key `579B532A...`
+- **Tarjetas de prueba:** Visa `4051885600446623`, Mastercard `5186059559590568`
+- **Auth sandbox:** RUT `11.111.111-1`, clave `123`
+- **Notas:** buy_order truncado a 26 chars, config lee WEBPAY_SECRET como api_key y WEBPAY_KEY como commerce_code
