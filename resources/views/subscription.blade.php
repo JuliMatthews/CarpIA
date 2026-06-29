@@ -11,9 +11,9 @@
             <div class="w-full bg-[#1e1e1e] border border-[#2a2a2a] rounded-xl p-6 mb-6">
                 <div class="text-4xl font-bold text-[#7c3aed] mb-1">$1.990</div>
                 <div class="text-sm text-[#888888]">CLP / mes · Acceso completo a todos los modelos</div>
-                <button class="mt-4 w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition-colors">
+                <a href="/planes" class="block mt-4 w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition-colors text-center">
                     Obtener Suscripción
-                </button>
+                </a>
             </div>
 
             {{-- Divider --}}

@@ -64,6 +64,7 @@ Route::middleware('auth')->group(function () {
     })->name('promo.redeem');
 
     // Checkout routes (Transbank Webpay)
+    Route::get('/checkout/direct', [PaymentController::class, 'direct'])->name('checkout.direct');
     Route::post('/checkout/create', [PaymentController::class, 'create'])->name('checkout.create');
     Route::get('/checkout/return', [PaymentController::class, 'return'])->name('checkout.return');
 });

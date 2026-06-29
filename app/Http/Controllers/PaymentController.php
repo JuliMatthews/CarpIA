@@ -15,6 +15,40 @@ class PaymentController extends Controller
         private SubscriptionService $subscriptionService
     ) {}
 
+    public function direct(Request $request)
+    {
+        $plan = Plan::where('name', 'premium')->firstOrFail();
+
+        $user = $request->user();
+        $buyOrder = strtoupper(substr('CARPIA' . Str::ulid(), 0, 26));
+        $sessionId = $user->id . '-' . Str::random(10);
+        $amount = $plan->monthly_price;
+        $returnUrl = route('checkout.return');
+
+        $result = $this->transbankService->createTransaction(
+            $buyOrder,
+            $sessionId,
+            (int) $amount,
+            $returnUrl
+        );
+
+        session([
+            'pending_subscription' => [
+                'user_id' => $user->id,
+                'plan_id' => $plan->id,
+                'is_yearly' => false,
+                'buy_order' => $buyOrder,
+                'amount' => $amount,
+                'token' => $result['token'],
+            ],
+        ]);
+
+        return view('checkout.redirect', [
+            'url' => $result['url'],
+            'token' => $result['token'],
+        ]);
+    }
+
     public function create(Request $request)
     {
         $request->validate([
@@ -30,7 +64,7 @@ class PaymentController extends Controller
                 ->with('error', 'El plan gratuito no requiere pago.');
         }
 
-        $buyOrder = 'CARPIA-' . Str::ulid();
+        $buyOrder = strtoupper(substr('CARPIA' . Str::ulid(), 0, 26));
         $sessionId = $user->id . '-' . Str::random(10);
         $amount = $request->is_yearly ? $plan->yearly_price : $plan->monthly_price;
         $returnUrl = route('checkout.return');

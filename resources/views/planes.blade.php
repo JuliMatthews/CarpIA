@@ -35,7 +35,7 @@
                     {{ __('Suscripción CarpIA') }}
                 </h1>
                 <p class="text-lg text-[#888888] max-w-2xl mx-auto mb-32">
-                    {{ __('Accede a todos los modelos de IA por solo $990 al mes.') }}
+                    {{ __('Accede a todos los modelos de IA por solo $1.990 al mes.') }}
                 </p>
 
                 <div class="w-80 mx-auto">
@@ -45,7 +45,7 @@
                             <p class="text-sm text-[#888888] mt-1">{{ __('Acceso completo a CarpIA') }}</p>
                         </div>
                         <div class="text-center mb-6">
-                            <span class="text-5xl font-bold text-[#f0f0f0]">$990</span>
+                            <span class="text-5xl font-bold text-[#f0f0f0]">$1.990</span>
                             <span class="text-[#888888] text-lg">/mes</span>
                         </div>
                         <ul class="space-y-3 mb-8">
@@ -76,11 +76,11 @@
                         </ul>
                         @auth
                             <button class="w-full px-6 py-4 bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-medium rounded-xl transition-colors text-lg">
-                                {{ __('Pagar $990 — Suscribirse') }}
+                                {{ __('Pagar $1.990 — Suscribirse') }}
                             </button>
                         @else
                             <a href="{{ route('login') }}" class="block text-center px-6 py-4 bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-medium rounded-xl transition-colors text-lg">
-                                {{ __('Inicia sesión para suscribirte') }}
+                                {{ __('Comenzar') }}
                             </a>
                         @endauth
                     </div>

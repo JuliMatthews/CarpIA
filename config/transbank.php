@@ -26,8 +26,8 @@ return [
     */
 
     'webpay' => [
-        'api_key' => env('WEBPAY_KEY'),
-        'commerce_code' => env('WEBPAY_SECRET'),
+        'api_key' => env('WEBPAY_SECRET'),
+        'commerce_code' => env('WEBPAY_KEY'),
     ],
 
     /*

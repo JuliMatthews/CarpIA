@@ -94,9 +94,9 @@
                     <div class="w-full bg-[#1e1e1e] border border-[#2a2a2a] rounded-xl p-5 mb-6">
                         <div class="text-3xl font-bold text-[#7c3aed] mb-1">$1.990</div>
                         <div class="text-xs text-[#888888]">CLP / mes · Acceso completo a todos los modelos</div>
-                        <button class="mt-4 w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition-colors">
+                        <a href="/checkout/direct" style="display:inline-block;margin-top:1rem;padding:0.75rem 2rem;background-color:#10b981;color:white;border-radius:0.75rem;font-size:0.875rem;font-weight:600;text-align:center;text-decoration:none;">
                             Obtener Suscripción
-                        </button>
+                        </a>
                     </div>
 
                     <div class="relative w-full my-2 mb-4">
