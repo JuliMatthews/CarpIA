@@ -61,9 +61,12 @@
             </div>
 
             <div class="flex gap-4">
-                <a href="{{ $url }}" class="go-btn flex-1 text-center py-3 rounded-lg font-semibold text-white">
-                    Ir a Webpay (Pagar)
-                </a>
+                <form id="webpay-form" action="{{ $url }}" method="POST" class="flex-1">
+                    <input type="hidden" name="token_ws" value="{{ $token }}" />
+                    <button type="submit" class="go-btn w-full py-3 rounded-lg font-semibold text-white cursor-pointer">
+                        Ir a Webpay (Pagar)
+                    </button>
+                </form>
                 <a href="{{ route('checkout.test') }}" class="flex-1 text-center py-3 rounded-lg font-semibold bg-[#2a2a2a] text-[#f0f0f0] hover:bg-[#3a3a3a] transition">
                     Generar nueva transacción
                 </a>
