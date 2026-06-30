@@ -159,7 +159,7 @@ class PaymentController extends Controller
                 'testTx' => $testTx,
             ]);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return view('checkout.test-result', [
                 'success' => false,
                 'message' => 'Error al confirmar la transacción: ' . $e->getMessage(),
@@ -205,7 +205,7 @@ class PaymentController extends Controller
             return redirect()->route('planes')
                 ->with('error', 'El pago no fue aprobado. Intenta nuevamente.');
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             \Log::error('Webpay commit error: ' . $e->getMessage());
 
             return redirect()->route('planes')

@@ -44,9 +44,7 @@ class TransbankService
             'authorization_code' => $response->getAuthorizationCode(),
             'amount' => $response->getAmount(),
             'buy_order' => $response->getBuyOrder(),
-            'card_detail' => [
-                'card_number' => $response->getCardDetail()->getCardNumber(),
-            ],
+            'card_detail' => $response->getCardDetail(),
             'response_code' => $response->getResponseCode(),
             'transaction_date' => $response->getTransactionDate(),
         ];
