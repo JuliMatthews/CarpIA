@@ -83,6 +83,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::patch('/promo-codes/{promoCode}/toggle', [AdminController::class, 'togglePromoCode'])->name('promo-codes.toggle');
 });
 
+// Checkout test routes (Transbank validation - no auth required)
+Route::get('/checkout/test', [PaymentController::class, 'test'])->name('checkout.test');
+Route::get('/checkout/test-return', [PaymentController::class, 'testReturn'])->name('checkout.test-return');
+
 require __DIR__.'/auth.php';
 Route::get('/subscription/required', function () {
     return view('subscription');

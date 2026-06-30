@@ -95,6 +95,82 @@ class PaymentController extends Controller
         ]);
     }
 
+    public function test(Request $request)
+    {
+        $buyOrder = 'CARPIATEST-' . strtoupper(Str::random(10));
+        $sessionId = 'test-' . Str::random(10);
+        $amount = 1990;
+        $returnUrl = route('checkout.test-return');
+
+        $result = $this->transbankService->createTransaction(
+            $buyOrder,
+            $sessionId,
+            $amount,
+            $returnUrl
+        );
+
+        session([
+            'test_transaction' => [
+                'buy_order' => $buyOrder,
+                'session_id' => $sessionId,
+                'amount' => $amount,
+                'token' => $result['token'],
+                'created_at' => now()->toIso8601String(),
+            ],
+        ]);
+
+        return view('checkout.test', [
+            'token' => $result['token'],
+            'url' => $result['url'],
+            'buyOrder' => $buyOrder,
+            'amount' => $amount,
+        ]);
+    }
+
+    public function testReturn(Request $request)
+    {
+        $token = $request->input('token_ws') ?? $request->input('TBK_TOKEN');
+        $testTx = session('test_transaction');
+
+        if (!$token) {
+            return view('checkout.test-result', [
+                'success' => false,
+                'message' => 'No se recibió token de la transacción.',
+                'token' => null,
+                'status' => null,
+                'details' => null,
+                'testTx' => $testTx,
+            ]);
+        }
+
+        try {
+            $result = $this->transbankService->commitTransaction($token);
+
+            $isApproved = $result['status'] === 'AUTHORIZED';
+
+            return view('checkout.test-result', [
+                'success' => $isApproved,
+                'message' => $isApproved
+                    ? 'Transacción APROBADA correctamente.'
+                    : 'Transacción RECHAZADA (esto es esperado para tarjetas de prueba de rechazo).',
+                'token' => $token,
+                'status' => $result['status'],
+                'details' => $result,
+                'testTx' => $testTx,
+            ]);
+
+        } catch (\Exception $e) {
+            return view('checkout.test-result', [
+                'success' => false,
+                'message' => 'Error al confirmar la transacción: ' . $e->getMessage(),
+                'token' => $token,
+                'status' => 'ERROR',
+                'details' => null,
+                'testTx' => $testTx,
+            ]);
+        }
+    }
+
     public function return(Request $request)
     {
         $token = $request->input('token_ws') ?? $request->input('TBK_TOKEN');
