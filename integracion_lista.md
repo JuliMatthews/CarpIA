@@ -12,8 +12,9 @@
 | Sandbox probado | ✅ Funcional |
 | Formulario de validación (1er intento) | ❌ Rechazado |
 | Formulario de validación (2do intento) | ✅ Validación automática aprobada |
-| Confirmación de datos por soporte | ⏳ Esperando (24h hábiles) |
-| API Key productiva | ⏳ Pendiente |
+| Confirmación de datos por soporte | ✅ Recibida (2026-06-30) |
+| API Key productiva | ✅ Recibida (2026-06-30) |
+| Transacción de prueba producción | ⏳ Pendiente ($50 CLP con tarjeta real) |
 
 ### Resultado del 2do intento (2026-06-30)
 
@@ -56,11 +57,11 @@
 | Ambiente en `.env` | `TRANSBANK_ENV=integration` |
 | Constante SDK | `Options::ENVIRONMENT_INTEGRATION` (= `"TEST"`) |
 
-### Producción (pendiente)
+### Producción
 | Campo | Valor |
 |-------|-------|
 | Commerce Code | `597053087507` |
-| API Key | ⏳ Pendiente de Transbank |
+| API Key | `2318ba94-6726-446e-a202-cbd826c334ef` |
 | Ambiente en `.env` | `TRANSBANK_ENV=production` |
 
 ---
@@ -187,11 +188,11 @@ $environment = $env === 'production'
 
 ## Cuando Llegue la API Key Productiva
 
-### 1. Actualizar `.env` en producción
+### 1. Actualizar `.env` en producción ✅
 ```
 TRANSBANK_ENV=production
 WEBPAY_KEY=597053087507
-WEBPAY_SECRET=<API_KEY_QUE_ENVÍE_TRANSBANK>
+WEBPAY_SECRET=2318ba94-6726-446e-a202-cbd826c334ef
 ```
 
 ### 2. Limpiar caché

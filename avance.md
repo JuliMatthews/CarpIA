@@ -12,7 +12,13 @@ Se han implementado funcionalidades clave para la plataforma SaaS de IA **CarpIA
 
 ## Cambios Realizados Hoy (2026-06-30)
 
-### 1. Fix Environment Transbank
+### 1. API Key Productiva Transbank Recibida
+- Transbank respondió con credenciales productivas
+- Commerce Code: `597053087507`
+- API Key: `2318ba94-6726-446e-a202-cbd826c334ef`
+- **Acción requerida:** Actualizar `.env` en producción y hacer transacción de prueba de $50 CLP
+
+### 2. Fix Environment Transbank
 - Se corrigió el mapping de environment en `TransbankService.php`
 - El SDK espera `"TEST"` pero `.env` tenía `"integration"`
 - Se agregó mapeo correcto: `integration` → `Options::ENVIRONMENT_INTEGRATION`
@@ -57,11 +63,11 @@ Se han implementado funcionalidades clave para la plataforma SaaS de IA **CarpIA
 
 ## Para Cuando Llegue la API Key Productiva
 
-### 1. Actualizar `.env` en producción
+### 1. Actualizar `.env` en producción ✅ LISTO
 ```
 TRANSBANK_ENV=production
 WEBPAY_KEY=597053087507
-WEBPAY_SECRET=<API_KEY_QUE_ENVÍE_TRANSBANK>
+WEBPAY_SECRET=2318ba94-6726-446e-a202-cbd826c334ef
 ```
 
 ### 2. Limpiar caché
@@ -71,6 +77,8 @@ cd ~/carpia.cl && php artisan config:clear && php artisan cache:clear
 
 ### 3. Transacción de prueba en producción
 - Transbank pide al menos una transacción real de $50 CLP para validar
+- Usar tarjeta real (crédito o débito)
+- Si es exitosa, el sitio queda habilitado para cobros reales
 
 ---
 
@@ -220,10 +228,10 @@ php artisan migrate
 - [x] Fix config (credenciales invertidas api_key/commerce_code)
 - [x] Botón verde "Obtener Suscripción" funcional en dashboard
 - [x] Sandbox probado: Webpay carga, formulario funciona
-- [ ] **Obtener API Key de Transbank** (form: https://form.typeform.com/to/ibXdg6Av)
-- [ ] Actualizar `WEBPAY_KEY` y `WEBPAY_SECRET` en `.env` producción con credenciales reales
-- [ ] Cambiar `TRANSBANK_ENV=production` en `.env` producción
-- [ ] Probar flujo completo de pago en producción
+- [x] **Obtener API Key de Transbank** ✅ (2026-06-30)
+- [ ] **Actualizar `WEBPAY_KEY` y `WEBPAY_SECRET` en `.env` producción** ← ESTE PASO
+- [ ] **Cambiar `TRANSBANK_ENV=production` en `.env` producción**
+- [ ] **Probar flujo completo de pago en producción ($50 CLP)**
 - [ ] Configurar URL de retorno en portal de Transbank
 
 ### Pendientes
@@ -259,8 +267,8 @@ php artisan migrate:fresh --seed
 - Los links de sharing usan URLs oficiales de cada red (no necesitan cuentas de CarpIA)
 
 ### Transbank Webpay Plus
-- **Código de comercio producción:** 53087507
-- **API Key:** Pendiente - obtener de Transbank via form de validación
+- **Código de comercio producción:** 597053087507
+- **API Key producción:** `2318ba94-6726-446e-a202-cbd826c334ef` ✅
 - **URL retorno producción:** `https://carpia.cl/checkout/return`
 - **SDK instalado:** `transbank/transbank-sdk:^5.0`
 - **Flujo:** GET /checkout/direct → Redirect Webpay → GET /checkout/return → Confirmar
