@@ -11,8 +11,38 @@
 | SDK instalado | `transbank/transbank-sdk:^5.0` |
 | Sandbox probado | ✅ Funcional |
 | Formulario de validación (1er intento) | ❌ Rechazado |
-| Formulario de validación (2do intento) | ✅ Completado — esperando respuesta |
-| API Key productiva | ⏳ Pendiente (24h hábiles) |
+| Formulario de validación (2do intento) | ✅ Validación automática aprobada |
+| Confirmación de datos por soporte | ⏳ Esperando (24h hábiles) |
+| API Key productiva | ⏳ Pendiente |
+
+### Resultado del 2do intento (2026-06-30)
+
+| Prueba | Estado |
+|--------|--------|
+| Crédito aprobada sin cuotas | ✅ |
+| Crédito rechazada sin cuotas | ✅ |
+| Crédito aprobada con cuotas | ✅ |
+| Débito/prepago aprobada | ✅ |
+| Débito/prepago rechazada | ✅ |
+| Transacción abortada | ✅ |
+| Logo (130x59px) | ✅ |
+| RUT del comercio | ✅ |
+| Código de comercio productivo | ✅ |
+| URL | ✅ |
+| Anulaciones parcial (opcional) | ⚠️ No implementadas |
+| Anulaciones total (opcional) | ⏳ No implementadas |
+
+> **Nota:** Las anulaciones son opcionales y no afectan la validación.
+
+---
+
+## Próximos pasos
+
+1. ⏳ Esperar correo/llamada de soporte Transbank (ia.carpia.cl@gmail.com / +56972164736)
+2. Confirmar datos del comercio
+3. Recibir API Key productiva
+4. Actualizar `.env` en producción
+5. Hacer transacción de prueba de $50 CLP en producción
 
 ---
 
