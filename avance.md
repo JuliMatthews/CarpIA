@@ -1,4 +1,4 @@
-# Avance del Proyecto CarpIA.cl — 2026-06-29
+# Avance del Proyecto CarpIA.cl — 2026-06-30
 
 ## Resumen General
 
@@ -6,7 +6,73 @@ Se han implementado funcionalidades clave para la plataforma SaaS de IA **CarpIA
 
 **Stack Principal:** Laravel 12, PHP 8.4, Livewire 3, AlpineJS, TailwindCSS 4, MySQL.
 
-**Estado Actual:** Fases 1-4 completadas. Integración con Transbank Webpay Plus lista para producción.
+**Estado Actual:** Fases 1-4 completadas. Validación de Transbank Webpay Plus enviada, esperando API Key productiva.
+
+---
+
+## Cambios Realizados Hoy (2026-06-30)
+
+### 1. Fix Environment Transbank
+- Se corrigió el mapping de environment en `TransbankService.php`
+- El SDK espera `"TEST"` pero `.env` tenía `"integration"`
+- Se agregó mapeo correcto: `integration` → `Options::ENVIRONMENT_INTEGRATION`
+
+### 2. Fix TransbankService commitTransaction
+- Se corrigió error fatal en `getCardDetail()->getCardNumber()`
+- `getCardDetail()` retorna un array PHP, no un objeto
+- Se cambió a `$response->getCardDetail()` directamente
+
+### 3. Fix PaymentController catch blocks
+- Se cambió `catch (\Exception $e)` por `catch (\Throwable $e)`
+- PHP 8.x distingue entre Exception y Error
+- Esto captura errores fatales del SDK
+
+### 4. Fix Transbank environment en producción
+- El `.env` de producción tenía `TRANSBANK_ENV=production` con credenciales sandbox
+- Se cambió a `TRANSBANK_ENV=integration`
+
+### 5. Segunda validación de Transbank
+- Se completó el formulario de validación por segunda vez
+- Todas las pruebas pasaron correctamente:
+  - ✅ Crédito aprobada sin cuotas
+  - ✅ Crédito rechazada sin cuotas
+  - ✅ Crédito aprobada con cuotas
+  - ✅ Débito/prepago aprobada
+  - ✅ Débito/prepago rechazada
+  - ✅ Transacción cancelada por usuario
+- Logo ajustado a 130x59px
+- Enviado a validación — esperando API Key productiva (24h hábiles)
+
+---
+
+## Archivos Modificados Hoy
+
+| Archivo | Acción | Descripción |
+|---------|--------|-------------|
+| `app/Services/TransbankService.php` | Modificado | Fix environment mapping + commitTransaction card_detail |
+| `app/Http/Controllers/PaymentController.php` | Modificado | catch \Throwable en testReturn y return |
+| `integracion_lista.md` | Creado | Documentación completa de integración Transbank |
+
+---
+
+## Para Cuando Llegue la API Key Productiva
+
+### 1. Actualizar `.env` en producción
+```
+TRANSBANK_ENV=production
+WEBPAY_KEY=597053087507
+WEBPAY_SECRET=<API_KEY_QUE_ENVÍE_TRANSBANK>
+```
+
+### 2. Limpiar caché
+```bash
+cd ~/carpia.cl && php artisan config:clear && php artisan cache:clear
+```
+
+### 3. Transacción de prueba en producción
+- Transbank pide al menos una transacción real de $50 CLP para validar
+
+---
 
 ---
 
