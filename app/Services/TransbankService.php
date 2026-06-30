@@ -27,7 +27,21 @@ class TransbankService
 
     public function createTransaction(string $buyOrder, string $sessionId, int $amount, string $returnUrl): array
     {
+        \Log::info('Transbank createTransaction', [
+            'buy_order' => $buyOrder,
+            'session_id' => $sessionId,
+            'amount' => $amount,
+            'return_url' => $returnUrl,
+            'environment' => config('transbank.environment'),
+            'commerce_code' => config('transbank.webpay.commerce_code'),
+        ]);
+
         $response = $this->transaction->create($buyOrder, $sessionId, $amount, $returnUrl);
+
+        \Log::info('Transbank createTransaction response', [
+            'token' => $response->getToken(),
+            'url' => $response->getUrl(),
+        ]);
 
         return [
             'token' => $response->getToken(),
