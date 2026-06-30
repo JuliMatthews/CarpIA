@@ -11,8 +11,11 @@ class TransbankService
 
     public function __construct()
     {
-        $environment = config('transbank.environment', Options::ENVIRONMENT_INTEGRATION);
-        
+        $env = config('transbank.environment', 'integration');
+        $environment = $env === 'production'
+            ? Options::ENVIRONMENT_PRODUCTION
+            : Options::ENVIRONMENT_INTEGRATION;
+
         $option = new Options(
             config('transbank.webpay.api_key'),
             config('transbank.webpay.commerce_code'),
