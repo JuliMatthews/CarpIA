@@ -6,6 +6,7 @@ use App\AI\Contracts\AIProvider;
 use App\DTOs\AIResponseDTO;
 use Generator;
 use Illuminate\Support\Facades\Http;
+use RuntimeException;
 
 class DeepSeekProvider implements AIProvider
 {
@@ -15,7 +16,13 @@ class DeepSeekProvider implements AIProvider
     {
         $start = microtime(true);
 
-        $response = Http::withToken(config('ai.providers.deepseek.api_key'))
+        $apiKey = config('ai.providers.deepseek.api_key');
+
+        if (empty($apiKey)) {
+            throw new RuntimeException('DeepSeek API key no configurada. Agrega DEEPSEEK_API_KEY en tu .env');
+        }
+
+        $response = Http::withToken($apiKey)
             ->timeout(30)
             ->post("{$this->baseUrl}/chat/completions", [
                 'model' => $options['model'] ?? 'deepseek-chat',
@@ -26,6 +33,15 @@ class DeepSeekProvider implements AIProvider
 
         $data = $response->json();
         $elapsed = (int) ((microtime(true) - $start) * 1000);
+
+        if (isset($data['error'])) {
+            $message = $data['error']['message'] ?? 'Error desconocido de DeepSeek';
+            throw new RuntimeException("DeepSeek API error: {$message}");
+        }
+
+        if (!$response->successful() || !isset($data['choices'][0]['message']['content'])) {
+            throw new RuntimeException("DeepSeek devolvió respuesta inválida: " . substr(json_encode($data), 0, 200));
+        }
 
         return new AIResponseDTO(
             content: $data['choices'][0]['message']['content'],
@@ -40,7 +56,9 @@ class DeepSeekProvider implements AIProvider
 
     public function streamMessage(array $messages, array $options = []): Generator
     {
-        $response = Http::withToken(config('ai.providers.deepseek.api_key'))
+        $apiKey = config('ai.providers.deepseek.api_key');
+
+        $response = Http::withToken($apiKey)
             ->withOptions(['stream' => true])
             ->timeout(60)
             ->post("{$this->baseUrl}/chat/completions", [

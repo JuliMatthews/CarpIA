@@ -6,6 +6,7 @@ use App\AI\Contracts\AIProvider;
 use App\DTOs\AIResponseDTO;
 use Generator;
 use Illuminate\Support\Facades\Http;
+use RuntimeException;
 
 class OpenRouterProvider implements AIProvider
 {
@@ -15,11 +16,17 @@ class OpenRouterProvider implements AIProvider
     {
         $start = microtime(true);
 
+        $apiKey = config('ai.providers.openrouter.api_key');
+
+        if (empty($apiKey)) {
+            throw new RuntimeException('OpenRouter API key no configurada. Agrega OPENROUTER_API_KEY en tu .env');
+        }
+
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . config('ai.providers.openrouter.api_key'),
-            'HTTP-Referer' => config('app.url'),
-            'X-Title' => 'CarpIA',
-        ])
+                'Authorization' => "Bearer {$apiKey}",
+                'HTTP-Referer' => config('app.url'),
+                'X-Title' => 'CarpIA',
+            ])
             ->timeout(30)
             ->post("{$this->baseUrl}/chat/completions", [
                 'model' => $options['model'] ?? 'meta-llama/llama-3.3-70b-instruct:free',
@@ -30,6 +37,15 @@ class OpenRouterProvider implements AIProvider
 
         $data = $response->json();
         $elapsed = (int) ((microtime(true) - $start) * 1000);
+
+        if (isset($data['error'])) {
+            $message = $data['error']['message'] ?? 'Error desconocido de OpenRouter';
+            throw new RuntimeException("OpenRouter API error: {$message}");
+        }
+
+        if (!$response->successful() || !isset($data['choices'][0]['message']['content'])) {
+            throw new RuntimeException("OpenRouter devolvió respuesta inválida: " . substr(json_encode($data), 0, 200));
+        }
 
         return new AIResponseDTO(
             content: $data['choices'][0]['message']['content'],
@@ -44,11 +60,13 @@ class OpenRouterProvider implements AIProvider
 
     public function streamMessage(array $messages, array $options = []): Generator
     {
+        $apiKey = config('ai.providers.openrouter.api_key');
+
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . config('ai.providers.openrouter.api_key'),
-            'HTTP-Referer' => config('app.url'),
-            'X-Title' => 'CarpIA',
-        ])
+                'Authorization' => "Bearer {$apiKey}",
+                'HTTP-Referer' => config('app.url'),
+                'X-Title' => 'CarpIA',
+            ])
             ->withOptions(['stream' => true])
             ->timeout(60)
             ->post("{$this->baseUrl}/chat/completions", [

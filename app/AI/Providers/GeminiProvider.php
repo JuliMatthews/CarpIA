@@ -6,6 +6,7 @@ use App\AI\Contracts\AIProvider;
 use App\DTOs\AIResponseDTO;
 use Generator;
 use Illuminate\Support\Facades\Http;
+use RuntimeException;
 
 class GeminiProvider implements AIProvider
 {
@@ -26,35 +27,49 @@ class GeminiProvider implements AIProvider
             ];
         }
 
+        $payload['generationConfig'] = [
+            'maxOutputTokens' => $options['max_tokens'] ?? 2048,
+        ];
+
         if (isset($options['temperature'])) {
-            $payload['generationConfig'] = [
-                'temperature' => $options['temperature'],
-                'maxOutputTokens' => $options['max_tokens'] ?? 2048,
-            ];
+            $payload['generationConfig']['temperature'] = $options['temperature'];
+        }
+
+        $apiKey = config('ai.providers.gemini.api_key');
+
+        if (empty($apiKey)) {
+            throw new RuntimeException('Gemini API key no configurada. Agrega GEMINI_API_KEY en tu .env');
         }
 
         $response = Http::timeout(30)
             ->post(
-                "{$this->baseUrl}/models/{$model}:generateContent?key=" . config('ai.providers.gemini.api_key'),
+                "{$this->baseUrl}/models/{$model}:generateContent?key={$apiKey}",
                 $payload
             );
 
         $data = $response->json();
         $elapsed = (int) ((microtime(true) - $start) * 1000);
 
+        if (isset($data['error'])) {
+            $code = $data['error']['code'] ?? 500;
+            $message = $data['error']['message'] ?? 'Error desconocido de Gemini';
+            throw new RuntimeException("Gemini API error ({$code}): {$message}");
+        }
+
         $content = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
 
-        $promptTokens = $data['usageMetadata']['promptTokenCount'] ?? null;
-        $completionTokens = $data['usageMetadata']['candidatesTokenCount'] ?? null;
-        $totalTokens = $data['usageMetadata']['totalTokenCount'] ?? null;
+        if (empty($content)) {
+            $finishReason = $data['candidates'][0]['finishReason'] ?? 'UNKNOWN';
+            throw new RuntimeException("Gemini devolvió respuesta vacía. finishReason: {$finishReason}");
+        }
 
         return new AIResponseDTO(
             content: $content,
             model: $model,
             provider: 'gemini',
-            promptTokens: $promptTokens,
-            completionTokens: $completionTokens,
-            totalTokens: $totalTokens,
+            promptTokens: $data['usageMetadata']['promptTokenCount'] ?? null,
+            completionTokens: $data['usageMetadata']['candidatesTokenCount'] ?? null,
+            totalTokens: $data['usageMetadata']['totalTokenCount'] ?? null,
             responseTimeMs: $elapsed,
         );
     }
@@ -82,21 +97,29 @@ class GeminiProvider implements AIProvider
             ];
         }
 
+        $apiKey = config('ai.providers.gemini.api_key');
+
         $response = Http::withOptions(['stream' => true])
             ->timeout(60)
             ->post(
-                "{$this->baseUrl}/models/{$model}:streamGenerateContent?key=" . config('ai.providers.gemini.api_key'),
+                "{$this->baseUrl}/models/{$model}:streamGenerateContent?key={$apiKey}&alt=sse",
                 $payload
             );
 
         $body = $response->body();
-        $decoder = json_decode($body, true);
+        $lines = explode("\n", $body);
 
-        if (isset($decoder['candidates'])) {
-            foreach ($decoder['candidates'] as $candidate) {
-                if (isset($candidate['content']['parts'][0]['text'])) {
-                    yield $candidate['content']['parts'][0]['text'];
-                }
+        foreach ($lines as $line) {
+            $line = trim($line);
+
+            if (empty($line) || !str_starts_with($line, 'data: ')) {
+                continue;
+            }
+
+            $data = json_decode(substr($line, 6), true);
+
+            if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
+                yield $data['candidates'][0]['content']['parts'][0]['text'];
             }
         }
     }

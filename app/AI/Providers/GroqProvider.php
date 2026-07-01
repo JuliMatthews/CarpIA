@@ -6,6 +6,7 @@ use App\AI\Contracts\AIProvider;
 use App\DTOs\AIResponseDTO;
 use Generator;
 use Illuminate\Support\Facades\Http;
+use RuntimeException;
 
 class GroqProvider implements AIProvider
 {
@@ -15,7 +16,13 @@ class GroqProvider implements AIProvider
     {
         $start = microtime(true);
 
-        $response = Http::withToken(config('ai.providers.groq.api_key'))
+        $apiKey = config('ai.providers.groq.api_key');
+
+        if (empty($apiKey)) {
+            throw new RuntimeException('Groq API key no configurada. Agrega GROQ_API_KEY en tu .env');
+        }
+
+        $response = Http::withToken($apiKey)
             ->timeout(30)
             ->post("{$this->baseUrl}/chat/completions", [
                 'model' => $options['model'] ?? 'llama-3.3-70b-versatile',
@@ -27,9 +34,19 @@ class GroqProvider implements AIProvider
         $data = $response->json();
         $elapsed = (int) ((microtime(true) - $start) * 1000);
 
+        if (isset($data['error'])) {
+            $message = $data['error']['message'] ?? 'Error desconocido de Groq';
+            $code = $data['error']['code'] ?? 500;
+            throw new RuntimeException("Groq API error ({$code}): {$message}");
+        }
+
+        if (!$response->successful() || !isset($data['choices'][0]['message']['content'])) {
+            throw new RuntimeException("Groq devolvió respuesta inválida: " . substr(json_encode($data), 0, 200));
+        }
+
         return new AIResponseDTO(
             content: $data['choices'][0]['message']['content'],
-            model: $data['model'],
+            model: $data['model'] ?? $options['model'] ?? 'unknown',
             provider: 'groq',
             promptTokens: $data['usage']['prompt_tokens'] ?? null,
             completionTokens: $data['usage']['completion_tokens'] ?? null,
@@ -40,7 +57,9 @@ class GroqProvider implements AIProvider
 
     public function streamMessage(array $messages, array $options = []): Generator
     {
-        $response = Http::withToken(config('ai.providers.groq.api_key'))
+        $apiKey = config('ai.providers.groq.api_key');
+
+        $response = Http::withToken($apiKey)
             ->withOptions(['stream' => true])
             ->timeout(60)
             ->post("{$this->baseUrl}/chat/completions", [

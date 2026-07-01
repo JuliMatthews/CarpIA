@@ -60,6 +60,17 @@ class ConversationList extends Component
         return app(FavoriteService::class)->isFavorite(Auth::user(), $conversationId);
     }
 
+    public function deleteConversation(int $conversationId): void
+    {
+        $user = Auth::user();
+        $conversation = $user->conversations()->find($conversationId);
+
+        if ($conversation) {
+            app(ConversationService::class)->delete($conversation);
+            $this->dispatch('conversationDeleted');
+        }
+    }
+
     public function render()
     {
         return view('livewire.sidebar.conversation-list');
