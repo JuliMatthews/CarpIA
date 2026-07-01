@@ -2,63 +2,48 @@
 
 namespace App\AI\Providers;
 
-use App\AI\Contracts\AIProvider;
+use App\AI\AbstractAIProvider;
 use App\DTOs\AIResponseDTO;
-use Generator;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
-use RuntimeException;
 
-class OpenRouterProvider implements AIProvider
+class OpenRouterProvider extends AbstractAIProvider
 {
-    private string $baseUrl = 'https://openrouter.ai/api/v1';
+    protected string $baseUrl = 'https://openrouter.ai/api/v1';
+    protected string $providerSlug = 'openrouter';
+    protected string $providerName = 'OpenRouter';
+    protected int $defaultTimeout = 30;
+    protected int $streamTimeout = 60;
+    protected int $connectTimeout = 10;
+    protected int $retries = 2;
 
-    public function sendMessage(array $messages, array $options = []): AIResponseDTO
+    protected function getApiKey(): ?string
     {
-        $start = microtime(true);
-        $model = $options['model'] ?? 'meta-llama/llama-3.3-70b-instruct:free';
+        return config('ai.providers.openrouter.api_key');
+    }
 
-        $apiKey = config('ai.providers.openrouter.api_key');
+    protected function buildHeaders(string $apiKey): array
+    {
+        return [
+            'Authorization' => "Bearer {$apiKey}",
+            'HTTP-Referer' => config('app.url', 'https://carpia.cl'),
+            'X-Title' => 'CarpIA',
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+            'User-Agent' => 'CarpIA/1.0',
+        ];
+    }
 
-        if (empty($apiKey)) {
-            throw new RuntimeException('OpenRouter API key no configurada. Agrega OPENROUTER_API_KEY en tu .env');
-        }
+    protected function buildPayload(array $messages, array $options): array
+    {
+        return [
+            'model' => $options['model'] ?? 'meta-llama/llama-3.3-70b-instruct:free',
+            'messages' => $messages,
+            'temperature' => $options['temperature'] ?? 0.7,
+            'max_tokens' => $options['max_tokens'] ?? 2048,
+        ];
+    }
 
-        $url = "{$this->baseUrl}/chat/completions";
-
-        $response = Http::withHeaders([
-                'Authorization' => "Bearer {$apiKey}",
-                'HTTP-Referer' => config('app.url'),
-                'X-Title' => 'CarpIA',
-            ])
-            ->timeout(30)
-            ->post($url, [
-                'model' => $model,
-                'messages' => $messages,
-                'temperature' => $options['temperature'] ?? 0.7,
-                'max_tokens' => $options['max_tokens'] ?? 2048,
-            ]);
-
-        $data = $response->json();
-        $elapsed = (int) ((microtime(true) - $start) * 1000);
-
-        Log::info('OpenRouter API response', [
-            'url' => $url,
-            'model' => $model,
-            'status' => $response->status(),
-            'elapsed_ms' => $elapsed,
-            'response_body' => substr(json_encode($data), 0, 500),
-        ]);
-
-        if (isset($data['error'])) {
-            $message = $data['error']['message'] ?? 'Error desconocido de OpenRouter';
-            throw new RuntimeException("OpenRouter API error: {$message}");
-        }
-
-        if (!$response->successful() || !isset($data['choices'][0]['message']['content'])) {
-            throw new RuntimeException("OpenRouter devolvió respuesta inválida (HTTP {$response->status()}): " . substr(json_encode($data), 0, 300));
-        }
-
+    protected function parseResponse(array $data, string $model): AIResponseDTO
+    {
         return new AIResponseDTO(
             content: $data['choices'][0]['message']['content'],
             model: $data['model'] ?? $model,
@@ -66,51 +51,19 @@ class OpenRouterProvider implements AIProvider
             promptTokens: $data['usage']['prompt_tokens'] ?? null,
             completionTokens: $data['usage']['completion_tokens'] ?? null,
             totalTokens: $data['usage']['total_tokens'] ?? null,
-            responseTimeMs: $elapsed,
+            responseTimeMs: null,
         );
     }
 
-    public function streamMessage(array $messages, array $options = []): Generator
+    protected function parseStreamLine(string $line): ?string
     {
-        $apiKey = config('ai.providers.openrouter.api_key');
+        $json = json_decode($line, true);
 
-        $response = Http::withHeaders([
-                'Authorization' => "Bearer {$apiKey}",
-                'HTTP-Referer' => config('app.url'),
-                'X-Title' => 'CarpIA',
-            ])
-            ->withOptions(['stream' => true])
-            ->timeout(60)
-            ->post("{$this->baseUrl}/chat/completions", [
-                'model' => $options['model'] ?? 'meta-llama/llama-3.3-70b-instruct:free',
-                'messages' => $messages,
-                'temperature' => $options['temperature'] ?? 0.7,
-                'max_tokens' => $options['max_tokens'] ?? 2048,
-                'stream' => true,
-            ]);
-
-        $body = $response->body();
-        $lines = explode("\n", $body);
-
-        foreach ($lines as $line) {
-            $line = trim($line);
-
-            if (empty($line) || !str_starts_with($line, 'data: ')) {
-                continue;
-            }
-
-            $data = substr($line, 6);
-
-            if ($data === '[DONE]') {
-                break;
-            }
-
-            $json = json_decode($data, true);
-
-            if (isset($json['choices'][0]['delta']['content'])) {
-                yield $json['choices'][0]['delta']['content'];
-            }
+        if (isset($json['choices'][0]['delta']['content'])) {
+            return $json['choices'][0]['delta']['content'];
         }
+
+        return null;
     }
 
     public function getAvailableModels(): array
@@ -127,15 +80,5 @@ class OpenRouterProvider implements AIProvider
     public function isAvailable(): bool
     {
         return !empty(config('ai.providers.openrouter.api_key'));
-    }
-
-    public function getName(): string
-    {
-        return 'OpenRouter';
-    }
-
-    public function getSlug(): string
-    {
-        return 'openrouter';
     }
 }

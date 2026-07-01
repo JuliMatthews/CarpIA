@@ -2,36 +2,55 @@
 
 namespace App\AI\Providers;
 
-use App\AI\Contracts\AIProvider;
+use App\AI\AbstractAIProvider;
 use App\DTOs\AIResponseDTO;
-use Generator;
 use Illuminate\Support\Facades\Http;
 
-class OllamaProvider implements AIProvider
+class OllamaProvider extends AbstractAIProvider
 {
-    private string $baseUrl;
+    protected string $baseUrl;
+    protected string $providerSlug = 'ollama';
+    protected string $providerName = 'Ollama';
+    protected int $defaultTimeout = 60;
+    protected int $streamTimeout = 120;
+    protected int $connectTimeout = 5;
+    protected int $retries = 1;
 
     public function __construct()
     {
         $this->baseUrl = config('ai.providers.ollama.base_url', 'http://localhost:11434');
     }
 
-    public function sendMessage(array $messages, array $options = []): AIResponseDTO
+    protected function getApiKey(): ?string
     {
-        $start = microtime(true);
-        $model = $options['model'] ?? 'llama3.2';
+        return null;
+    }
 
-        $response = Http::timeout(60)
-            ->post("{$this->baseUrl}/v1/chat/completions", [
-                'model' => $model,
-                'messages' => $messages,
-                'temperature' => $options['temperature'] ?? 0.7,
-                'max_tokens' => $options['max_tokens'] ?? 2048,
-            ]);
+    protected function buildHeaders(string $apiKey): array
+    {
+        return [
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ];
+    }
 
-        $data = $response->json();
-        $elapsed = (int) ((microtime(true) - $start) * 1000);
+    protected function buildPayload(array $messages, array $options): array
+    {
+        return [
+            'model' => $options['model'] ?? 'llama3.2',
+            'messages' => $messages,
+            'temperature' => $options['temperature'] ?? 0.7,
+            'max_tokens' => $options['max_tokens'] ?? 2048,
+        ];
+    }
 
+    protected function buildUrl(string $endpoint): string
+    {
+        return "{$this->baseUrl}/v1/chat/completions";
+    }
+
+    protected function parseResponse(array $data, string $model): AIResponseDTO
+    {
         return new AIResponseDTO(
             content: $data['choices'][0]['message']['content'],
             model: $data['model'] ?? $model,
@@ -39,46 +58,24 @@ class OllamaProvider implements AIProvider
             promptTokens: $data['usage']['prompt_tokens'] ?? null,
             completionTokens: $data['usage']['completion_tokens'] ?? null,
             totalTokens: $data['usage']['total_tokens'] ?? null,
-            responseTimeMs: $elapsed,
+            responseTimeMs: null,
         );
     }
 
-    public function streamMessage(array $messages, array $options = []): Generator
+    protected function parseStreamLine(string $line): ?string
     {
-        $model = $options['model'] ?? 'llama3.2';
+        $json = json_decode($line, true);
 
-        $response = Http::withOptions(['stream' => true])
-            ->timeout(120)
-            ->post("{$this->baseUrl}/v1/chat/completions", [
-                'model' => $model,
-                'messages' => $messages,
-                'temperature' => $options['temperature'] ?? 0.7,
-                'max_tokens' => $options['max_tokens'] ?? 2048,
-                'stream' => true,
-            ]);
-
-        $body = $response->body();
-        $lines = explode("\n", $body);
-
-        foreach ($lines as $line) {
-            $line = trim($line);
-
-            if (empty($line) || !str_starts_with($line, 'data: ')) {
-                continue;
-            }
-
-            $data = substr($line, 6);
-
-            if ($data === '[DONE]') {
-                break;
-            }
-
-            $json = json_decode($data, true);
-
-            if (isset($json['choices'][0]['delta']['content'])) {
-                yield $json['choices'][0]['delta']['content'];
-            }
+        if (isset($json['choices'][0]['delta']['content'])) {
+            return $json['choices'][0]['delta']['content'];
         }
+
+        return null;
+    }
+
+    protected function validateApiKey(?string $apiKey): void
+    {
+        // Ollama no necesita API key
     }
 
     public function getAvailableModels(): array
@@ -112,15 +109,5 @@ class OllamaProvider implements AIProvider
         } catch (\Exception) {
             return false;
         }
-    }
-
-    public function getName(): string
-    {
-        return 'Ollama';
-    }
-
-    public function getSlug(): string
-    {
-        return 'ollama';
     }
 }

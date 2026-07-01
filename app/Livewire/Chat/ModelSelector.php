@@ -23,9 +23,23 @@ class ModelSelector extends Component
         $manager = app(AIManager::class);
         $activeProviders = $manager->getActiveProviders();
 
+        $priorityOrder = ['groq', 'mistral', 'openrouter', 'gemini', 'deepseek', 'cloudflare', 'huggingface', 'ollama'];
+
+        $sortedProviders = [];
+        foreach ($priorityOrder as $slug) {
+            if (isset($activeProviders[$slug])) {
+                $sortedProviders[$slug] = $activeProviders[$slug];
+            }
+        }
+        foreach ($activeProviders as $slug => $provider) {
+            if (!isset($sortedProviders[$slug])) {
+                $sortedProviders[$slug] = $provider;
+            }
+        }
+
         $this->providers = [];
 
-        foreach ($activeProviders as $slug => $provider) {
+        foreach ($sortedProviders as $slug => $provider) {
             $models = AiModel::where('is_active', true)
                 ->whereHas('provider', fn($q) => $q->where('slug', $slug))
                 ->with('provider')

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Chat;
 
+use App\AI\AIHandler;
 use App\AI\AIManager;
 use App\Jobs\GenerateConversationTitle;
 use App\Models\AiModel;
@@ -20,6 +21,7 @@ class ChatInterface extends Component
     public string $streamedContent = '';
     public string $lastUserMessage = '';
     public bool $searchWeb = false;
+    public ?string $errorMessage = null;
 
     public function mount(?int $conversationId = null): void
     {
@@ -118,6 +120,7 @@ class ChatInterface extends Component
         }
 
         $this->lastUserMessage = $content;
+        $this->errorMessage = null;
 
         $fileMeta = !empty($files) ? ['files' => $files] : null;
         $userMessage = $messageService->storeUserMessage($this->conversation, $content, $fileMeta);
@@ -125,10 +128,16 @@ class ChatInterface extends Component
 
         $aiMessages = $messageService->formatForAI($this->conversation);
 
-        $systemPrompt = $user->settings?->system_prompt;
-        if ($systemPrompt) {
-            array_unshift($aiMessages, ['role' => 'system', 'content' => $systemPrompt]);
+        // System prompt: base (idioma) + personalizado del usuario
+        $basePrompt = config('ai.system_prompt', 'Responde siempre en español.');
+        $userPrompt = $user->settings?->system_prompt;
+
+        $fullSystemPrompt = $basePrompt;
+        if ($userPrompt) {
+            $fullSystemPrompt .= "\n\n" . $userPrompt;
         }
+
+        array_unshift($aiMessages, ['role' => 'system', 'content' => $fullSystemPrompt]);
 
         if ($this->searchWeb && $content) {
             try {
@@ -169,6 +178,7 @@ class ChatInterface extends Component
             $response = $provider->sendMessage($aiMessages, [
                 'model' => $model->slug,
                 'temperature' => $this->conversation->temperature ?? 0.7,
+                'user_id' => $user->id,
             ]);
 
             \Log::info('ChatInterface: AI response received', [
@@ -194,14 +204,25 @@ class ChatInterface extends Component
             }
 
             $this->dispatch('conversationCreated');
+            $this->dispatch('scrollToBottom');
 
         } catch (\Exception $e) {
-            \Log::error('ChatInterface: AI error', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            $userMessage = AIErrorHandler::handleWithLog(
+                $e,
+                $model->provider->slug ?? 'unknown',
+                $model->slug ?? 'unknown',
+                $user->id
+            );
+
+            $this->errorMessage = $userMessage;
+
             $this->messages[] = [
                 'role' => 'assistant',
-                'content' => 'Error: ' . $e->getMessage(),
+                'content' => $userMessage,
                 'created_at' => now()->toISOString(),
             ];
+
+            $this->dispatch('scrollToBottom');
         }
 
         $this->isLoading = false;
@@ -212,6 +233,7 @@ class ChatInterface extends Component
     {
         $this->conversation = null;
         $this->messages = [];
+        $this->errorMessage = null;
         $this->selectedModelId = auth()->user()->default_model_id;
 
         if (!$this->selectedModelId) {

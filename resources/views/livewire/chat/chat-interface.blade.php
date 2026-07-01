@@ -1,5 +1,5 @@
 <div
-    x-data="{ messageSent: false }"
+    x-data="{ messageSent: false, isLoading: @entangle('isLoading') }"
     @message-sent.window="
         messageSent = !messageSent;
         $nextTick(() => {
@@ -7,6 +7,13 @@
             if (el) el.scrollTop = el.scrollHeight;
         });
     "
+    @scroll-to-bottom.window="
+        $nextTick(() => {
+            const el = $el.querySelector('.messages-container');
+            if (el) el.scrollTop = el.scrollHeight;
+        });
+    "
+    x-effect="if (isLoading) { $nextTick(() => { const el = $el.querySelector('.messages-container'); if (el) el.scrollTop = el.scrollHeight; }); }"
     @copy-to-clipboard.window="
         navigator.clipboard.writeText($event.detail.content);
         showToast('Copiado al portapapeles');

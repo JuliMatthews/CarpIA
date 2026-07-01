@@ -124,15 +124,31 @@
 
 <script>
 document.addEventListener('livewire:initialized', () => {
-    const textarea = document.getElementById('chat-textarea');
-    const sendBtn = document.getElementById('send-btn');
-    if (textarea && sendBtn) {
-        textarea.addEventListener('keydown', (e) => {
+    const initTextarea = () => {
+        const textarea = document.getElementById('chat-textarea');
+        if (!textarea) return;
+
+        textarea.removeEventListener('keydown', textarea._keydownHandler);
+
+        textarea._keydownHandler = (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                sendBtn.click();
+                const form = textarea.closest('form');
+                if (form) form.requestSubmit();
             }
-        });
-    }
+        };
+
+        textarea.addEventListener('keydown', textarea._keydownHandler);
+    };
+
+    initTextarea();
+    document.addEventListener('livewire:navigated', initTextarea);
+
+    const observer = new MutationObserver(() => {
+        const textarea = document.getElementById('chat-textarea');
+        if (textarea && !textarea._keydownHandler) initTextarea();
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
 });
 </script>

@@ -12,6 +12,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | System Prompt por defecto
+    |--------------------------------------------------------------------------
+    |
+    | Este prompt se inyecta automáticamente en todas las conversaciones.
+    | Define el comportamiento base del asistente.
+    |
+    */
+
+    'system_prompt' => env('AI_SYSTEM_PROMPT', 'Eres CarpIA, un asistente de inteligencia artificial. Responde siempre en español de Chile, de forma clara, profesional y amigable. Si el usuario te escribe en otro idioma, responde en español a menos que te pidan explícitamente responder en otro idioma.'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Configuración de proveedores
     |--------------------------------------------------------------------------
     */

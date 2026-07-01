@@ -2,54 +2,59 @@
 
 namespace App\AI\Providers;
 
-use App\AI\Contracts\AIProvider;
+use App\AI\AbstractAIProvider;
 use App\DTOs\AIResponseDTO;
-use Generator;
-use Illuminate\Support\Facades\Http;
-use RuntimeException;
 
-class HuggingFaceProvider implements AIProvider
+class HuggingFaceProvider extends AbstractAIProvider
 {
-    private string $baseUrl = 'https://api-inference.huggingface.co';
+    protected string $baseUrl = 'https://api-inference.huggingface.co';
+    protected string $providerSlug = 'huggingface';
+    protected string $providerName = 'HuggingFace';
+    protected int $defaultTimeout = 60;
+    protected int $streamTimeout = 60;
+    protected int $connectTimeout = 10;
+    protected int $retries = 1;
 
-    public function sendMessage(array $messages, array $options = []): AIResponseDTO
+    protected function getApiKey(): ?string
     {
-        $start = microtime(true);
-        $model = $options['model'] ?? 'mistralai/Mistral-7B-Instruct-v0.3';
+        return config('ai.providers.huggingface.api_key');
+    }
 
-        $apiKey = config('ai.providers.huggingface.api_key');
+    protected function buildHeaders(string $apiKey): array
+    {
+        return [
+            'Authorization' => "Bearer {$apiKey}",
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+            'User-Agent' => 'CarpIA/1.0',
+        ];
+    }
 
-        if (empty($apiKey)) {
-            throw new RuntimeException('HuggingFace API key no configurada. Agrega HUGGINGFACE_API_KEY en tu .env');
-        }
+    protected function buildUrl(string $endpoint): string
+    {
+        $model = request()->get('model', 'mistralai/Mistral-7B-Instruct-v0.3');
+        return "{$this->baseUrl}/models/{$model}";
+    }
 
+    protected function buildPayload(array $messages, array $options): array
+    {
         $prompt = $this->formatAsPrompt($messages);
 
-        $response = Http::withToken($apiKey)
-            ->timeout(60)
-            ->post("{$this->baseUrl}/models/{$model}", [
-                'inputs' => $prompt,
-                'parameters' => [
-                    'max_new_tokens' => $options['max_tokens'] ?? 2048,
-                    'temperature' => $options['temperature'] ?? 0.7,
-                    'return_full_text' => false,
-                ],
-            ]);
+        return [
+            'inputs' => $prompt,
+            'parameters' => [
+                'max_new_tokens' => $options['max_tokens'] ?? 2048,
+                'temperature' => $options['temperature'] ?? 0.7,
+                'return_full_text' => false,
+            ],
+        ];
+    }
 
-        $data = $response->json();
-        $elapsed = (int) ((microtime(true) - $start) * 1000);
-
-        if (isset($data['error'])) {
-            throw new RuntimeException("HuggingFace API error: {$data['error']}");
-        }
-
+    protected function parseResponse(array $data, string $model): AIResponseDTO
+    {
         $content = is_array($data) && isset($data[0]['generated_text'])
             ? $data[0]['generated_text']
             : ($data['generated_text'] ?? '');
-
-        if (empty($content)) {
-            throw new RuntimeException("HuggingFace devolvió respuesta vacía: " . substr(json_encode($data), 0, 200));
-        }
 
         return new AIResponseDTO(
             content: $content,
@@ -58,44 +63,127 @@ class HuggingFaceProvider implements AIProvider
             promptTokens: null,
             completionTokens: null,
             totalTokens: null,
-            responseTimeMs: $elapsed,
+            responseTimeMs: null,
         );
     }
 
-    public function streamMessage(array $messages, array $options = []): Generator
+    protected function parseStreamLine(string $line): ?string
+    {
+        $json = json_decode($line, true);
+
+        if (isset($json['token']['text'])) {
+            return $json['token']['text'];
+        }
+
+        return null;
+    }
+
+    public function sendMessage(array $messages, array $options = []): AIResponseDTO
+    {
+        $start = microtime(true);
+        $model = $options['model'] ?? 'mistralai/Mistral-7B-Instruct-v0.3';
+        $apiKey = $this->getApiKey();
+
+        $this->validateApiKey($apiKey);
+
+        $url = "{$this->baseUrl}/models/{$model}";
+        $payload = $this->buildPayload($messages, $options);
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::withHeaders($this->buildHeaders($apiKey))
+                ->timeout($this->defaultTimeout)
+                ->connectTimeout($this->connectTimeout)
+                ->retry($this->retries, 1000)
+                ->post($url, $payload);
+
+            $data = $response->json();
+            $elapsed = (int) ((microtime(true) - $start) * 1000);
+
+            $this->logResponse($url, $model, $response->status(), $elapsed, $data, $options['user_id'] ?? null);
+
+            if (isset($data['error'])) {
+                throw \App\Exceptions\AI\AIProviderException::provider($this->providerName, $data['error']);
+            }
+
+            $content = is_array($data) && isset($data[0]['generated_text'])
+                ? $data[0]['generated_text']
+                : ($data['generated_text'] ?? '');
+
+            if (empty($content)) {
+                throw \App\Exceptions\AI\AIProviderException::provider($this->providerName, 'Respuesta vacía del servidor');
+            }
+
+            return new AIResponseDTO(
+                content: $content,
+                model: $model,
+                provider: 'huggingface',
+                promptTokens: null,
+                completionTokens: null,
+                totalTokens: null,
+                responseTimeMs: $elapsed,
+            );
+
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            $elapsed = (int) ((microtime(true) - $start) * 1000);
+            $this->logError($url, $model, 0, $elapsed, $e, $options['user_id'] ?? null);
+            throw \App\Exceptions\AI\AIConnectionException::provider($this->providerName, $e->getMessage(), $e);
+
+        } catch (\App\Exceptions\AI\AIException $e) {
+            $elapsed = (int) ((microtime(true) - $start) * 1000);
+            $this->logError($url, $model, 0, $elapsed, $e, $options['user_id'] ?? null);
+            throw $e;
+
+        } catch (\Throwable $e) {
+            $elapsed = (int) ((microtime(true) - $start) * 1000);
+            $this->logError($url, $model, 0, $elapsed, $e, $options['user_id'] ?? null);
+            throw \App\Exceptions\AI\AIProviderException::provider($this->providerName, $e->getMessage(), $e);
+        }
+    }
+
+    public function streamMessage(array $messages, array $options = []): \Generator
     {
         $model = $options['model'] ?? 'mistralai/Mistral-7B-Instruct-v0.3';
-        $prompt = $this->formatAsPrompt($messages);
+        $apiKey = $this->getApiKey();
 
-        $response = Http::withToken(config('ai.providers.huggingface.api_key'))
-            ->withOptions(['stream' => true])
-            ->timeout(60)
-            ->post("{$this->baseUrl}/models/{$model}", [
-                'inputs' => $prompt,
-                'parameters' => [
-                    'max_new_tokens' => $options['max_tokens'] ?? 2048,
-                    'temperature' => $options['temperature'] ?? 0.7,
-                    'return_full_text' => false,
-                ],
-            ]);
+        $this->validateApiKey($apiKey);
 
-        $body = $response->body();
-        $lines = explode("\n", $body);
+        $url = "{$this->baseUrl}/models/{$model}";
+        $payload = $this->buildPayload($messages, $options);
 
-        foreach ($lines as $line) {
-            $line = trim($line);
+        try {
+            $response = \Illuminate\Support\Facades\Http::withHeaders($this->buildHeaders($apiKey))
+                ->withOptions(['stream' => true])
+                ->timeout($this->streamTimeout)
+                ->connectTimeout($this->connectTimeout)
+                ->post($url, $payload);
 
-            if (empty($line) || !str_starts_with($line, 'data: ')) {
-                continue;
+            $body = $response->body();
+            $lines = explode("\n", $body);
+
+            foreach ($lines as $line) {
+                $line = trim($line);
+
+                if (empty($line) || !str_starts_with($line, 'data: ')) {
+                    continue;
+                }
+
+                $data = substr($line, 6);
+
+                $json = json_decode($data, true);
+
+                if (isset($json['token']['text'])) {
+                    yield $json['token']['text'];
+                }
             }
 
-            $data = substr($line, 6);
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            throw \App\Exceptions\AI\AIConnectionException::provider($this->providerName, $e->getMessage(), $e);
 
-            $json = json_decode($data, true);
+        } catch (\App\Exceptions\AI\AIException $e) {
+            throw $e;
 
-            if (isset($json['token']['text'])) {
-                yield $json['token']['text'];
-            }
+        } catch (\Throwable $e) {
+            throw \App\Exceptions\AI\AIProviderException::provider($this->providerName, $e->getMessage(), $e);
         }
     }
 
@@ -109,16 +197,6 @@ class HuggingFaceProvider implements AIProvider
     public function isAvailable(): bool
     {
         return !empty(config('ai.providers.huggingface.api_key'));
-    }
-
-    public function getName(): string
-    {
-        return 'HuggingFace';
-    }
-
-    public function getSlug(): string
-    {
-        return 'huggingface';
     }
 
     private function formatAsPrompt(array $messages): string

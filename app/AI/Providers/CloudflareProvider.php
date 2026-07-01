@@ -2,45 +2,49 @@
 
 namespace App\AI\Providers;
 
-use App\AI\Contracts\AIProvider;
+use App\AI\AbstractAIProvider;
 use App\DTOs\AIResponseDTO;
-use Generator;
-use Illuminate\Support\Facades\Http;
-use RuntimeException;
+use App\Exceptions\AI\AIAuthenticationException;
 
-class CloudflareProvider implements AIProvider
+class CloudflareProvider extends AbstractAIProvider
 {
-    public function sendMessage(array $messages, array $options = []): AIResponseDTO
+    protected string $baseUrl = 'https://api.cloudflare.com/client/v4/accounts';
+    protected string $providerSlug = 'cloudflare';
+    protected string $providerName = 'Cloudflare';
+    protected int $defaultTimeout = 30;
+    protected int $streamTimeout = 60;
+    protected int $connectTimeout = 10;
+    protected int $retries = 2;
+
+    protected function getApiKey(): ?string
     {
-        $start = microtime(true);
-        $model = $options['model'] ?? '@cf/meta/llama-3.1-8b-instruct';
+        return config('ai.providers.cloudflare.api_key');
+    }
 
-        $apiKey = config('ai.providers.cloudflare.api_key');
+    protected function buildHeaders(string $apiKey): array
+    {
+        return [
+            'Authorization' => "Bearer {$apiKey}",
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+            'User-Agent' => 'CarpIA/1.0',
+        ];
+    }
+
+    protected function buildUrl(string $endpoint): string
+    {
         $accountId = config('ai.providers.cloudflare.account_id');
+        $model = request()->get('model', '@cf/meta/llama-3.1-8b-instruct');
+        return "{$this->baseUrl}/{$accountId}/ai/run/{$model}";
+    }
 
-        if (empty($apiKey) || empty($accountId)) {
-            throw new RuntimeException('Cloudflare API key o account_id no configurado.');
-        }
+    protected function buildPayload(array $messages, array $options): array
+    {
+        return ['messages' => $messages];
+    }
 
-        $response = Http::withToken($apiKey)
-            ->timeout(30)
-            ->post(
-                "https://api.cloudflare.com/client/v4/accounts/{$accountId}/ai/run/{$model}",
-                ['messages' => $messages]
-            );
-
-        $data = $response->json();
-        $elapsed = (int) ((microtime(true) - $start) * 1000);
-
-        if (isset($data['errors']) && !empty($data['errors'])) {
-            $message = $data['errors'][0]['message'] ?? 'Error desconocido de Cloudflare';
-            throw new RuntimeException("Cloudflare API error: {$message}");
-        }
-
-        if (!isset($data['result']['response'])) {
-            throw new RuntimeException("Cloudflare devolvió respuesta inválida: " . substr(json_encode($data), 0, 200));
-        }
-
+    protected function parseResponse(array $data, string $model): AIResponseDTO
+    {
         return new AIResponseDTO(
             content: $data['result']['response'],
             model: $model,
@@ -48,39 +52,133 @@ class CloudflareProvider implements AIProvider
             promptTokens: null,
             completionTokens: null,
             totalTokens: null,
-            responseTimeMs: $elapsed,
+            responseTimeMs: null,
         );
     }
 
-    public function streamMessage(array $messages, array $options = []): Generator
+    protected function parseStreamLine(string $line): ?string
     {
-        $model = $options['model'] ?? '@cf/meta/llama-3.1-8b-instruct';
+        $json = json_decode($line, true);
 
-        $response = Http::withToken(config('ai.providers.cloudflare.api_key'))
-            ->withOptions(['stream' => true])
-            ->timeout(60)
-            ->post(
-                "https://api.cloudflare.com/client/v4/accounts/" . config('ai.providers.cloudflare.account_id') . "/ai/run/{$model}",
-                ['messages' => $messages, 'stream' => true]
+        if (isset($json['response'])) {
+            return $json['response'];
+        }
+
+        return null;
+    }
+
+    protected function validateApiKey(?string $apiKey): void
+    {
+        $accountId = config('ai.providers.cloudflare.account_id');
+
+        if (empty($apiKey) || empty($accountId)) {
+            throw AIAuthenticationException::missing($this->providerName);
+        }
+    }
+
+    public function sendMessage(array $messages, array $options = []): AIResponseDTO
+    {
+        $start = microtime(true);
+        $model = $options['model'] ?? '@cf/meta/llama-3.1-8b-instruct';
+        $apiKey = $this->getApiKey();
+        $accountId = config('ai.providers.cloudflare.account_id');
+
+        $this->validateApiKey($apiKey);
+
+        $url = "{$this->baseUrl}/{$accountId}/ai/run/{$model}";
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::withHeaders($this->buildHeaders($apiKey))
+                ->timeout($this->defaultTimeout)
+                ->connectTimeout($this->connectTimeout)
+                ->retry($this->retries, 1000)
+                ->post($url, ['messages' => $messages]);
+
+            $data = $response->json();
+            $elapsed = (int) ((microtime(true) - $start) * 1000);
+
+            $this->logResponse($url, $model, $response->status(), $elapsed, $data, $options['user_id'] ?? null);
+
+            if (isset($data['errors']) && !empty($data['errors'])) {
+                $message = $data['errors'][0]['message'] ?? 'Error desconocido de Cloudflare';
+                throw \App\Exceptions\AI\AIProviderException::provider($this->providerName, $message);
+            }
+
+            if (!isset($data['result']['response'])) {
+                throw \App\Exceptions\AI\AIProviderException::provider($this->providerName, 'Respuesta inválida del servidor');
+            }
+
+            return new AIResponseDTO(
+                content: $data['result']['response'],
+                model: $model,
+                provider: 'cloudflare',
+                promptTokens: null,
+                completionTokens: null,
+                totalTokens: null,
+                responseTimeMs: $elapsed,
             );
 
-        $body = $response->body();
-        $lines = explode("\n", $body);
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            $elapsed = (int) ((microtime(true) - $start) * 1000);
+            $this->logError($url, $model, 0, $elapsed, $e, $options['user_id'] ?? null);
+            throw \App\Exceptions\AI\AIConnectionException::provider($this->providerName, $e->getMessage(), $e);
 
-        foreach ($lines as $line) {
-            $line = trim($line);
+        } catch (\App\Exceptions\AI\AIException $e) {
+            $elapsed = (int) ((microtime(true) - $start) * 1000);
+            $this->logError($url, $model, 0, $elapsed, $e, $options['user_id'] ?? null);
+            throw $e;
 
-            if (empty($line) || !str_starts_with($line, 'data: ')) {
-                continue;
+        } catch (\Throwable $e) {
+            $elapsed = (int) ((microtime(true) - $start) * 1000);
+            $this->logError($url, $model, 0, $elapsed, $e, $options['user_id'] ?? null);
+            throw \App\Exceptions\AI\AIProviderException::provider($this->providerName, $e->getMessage(), $e);
+        }
+    }
+
+    public function streamMessage(array $messages, array $options = []): \Generator
+    {
+        $model = $options['model'] ?? '@cf/meta/llama-3.1-8b-instruct';
+        $apiKey = $this->getApiKey();
+        $accountId = config('ai.providers.cloudflare.account_id');
+
+        $this->validateApiKey($apiKey);
+
+        $url = "{$this->baseUrl}/{$accountId}/ai/run/{$model}";
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::withHeaders($this->buildHeaders($apiKey))
+                ->withOptions(['stream' => true])
+                ->timeout($this->streamTimeout)
+                ->connectTimeout($this->connectTimeout)
+                ->post($url, ['messages' => $messages, 'stream' => true]);
+
+            $body = $response->body();
+            $lines = explode("\n", $body);
+
+            foreach ($lines as $line) {
+                $line = trim($line);
+
+                if (empty($line) || !str_starts_with($line, 'data: ')) {
+                    continue;
+                }
+
+                $data = substr($line, 6);
+
+                $json = json_decode($data, true);
+
+                if (isset($json['response'])) {
+                    yield $json['response'];
+                }
             }
 
-            $data = substr($line, 6);
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            throw \App\Exceptions\AI\AIConnectionException::provider($this->providerName, $e->getMessage(), $e);
 
-            $json = json_decode($data, true);
+        } catch (\App\Exceptions\AI\AIException $e) {
+            throw $e;
 
-            if (isset($json['response'])) {
-                yield $json['response'];
-            }
+        } catch (\Throwable $e) {
+            throw \App\Exceptions\AI\AIProviderException::provider($this->providerName, $e->getMessage(), $e);
         }
     }
 
@@ -98,15 +196,5 @@ class CloudflareProvider implements AIProvider
     {
         return !empty(config('ai.providers.cloudflare.api_key'))
             && !empty(config('ai.providers.cloudflare.account_id'));
-    }
-
-    public function getName(): string
-    {
-        return 'Cloudflare';
-    }
-
-    public function getSlug(): string
-    {
-        return 'cloudflare';
     }
 }
