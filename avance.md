@@ -1,53 +1,68 @@
-# Avance del Proyecto CarpIA.cl — 2026-06-30
+# Avance del Proyecto CarpIA.cl — 2026-07-01
 
 ## Resumen General
 
-Se han implementado funcionalidades clave para la plataforma SaaS de IA **CarpIA.cl**, enfocadas en autenticación con Google, flujo de onboarding, sistema de suscripciones, códigos promocionales, funcionalidad de compartir para obtener acceso temporal (deshabilitada temporalmente) e **integración con Transbank Webpay Plus**.
+Plataforma SaaS de IA **CarpIA.cl** con chat funcional, integración Transbank Webpay Plus validada, y sistema de proveedores IA en producción.
 
 **Stack Principal:** Laravel 12, PHP 8.4, Livewire 3, AlpineJS, TailwindCSS 4, MySQL.
 
-**Estado Actual:** Fases 1-4 completadas. Validación de Transbank Webpay Plus enviada, esperando API Key productiva.
+**Estado Actual:** Fases 1-4 completadas. Transbank validado. Providers IA: solo Mistral funciona desde HostGator.
 
 ---
 
-## Cambios Realizados Hoy (2026-06-30)
+## Estado de Providers IA (Producción — 2026-07-01)
 
-### 1. API Key Productiva Transbank Recibida
-- Transbank respondió con credenciales productivas
-- Commerce Code: `597053087507`
-- API Key: `2318ba94-6726-446e-a202-cbd826c334ef`
-- **Acción requerida:** Actualizar `.env` en producción y hacer transacción de prueba de $50 CLP
+| Provider | Estado | HTTP | Problema |
+|----------|--------|------|----------|
+| **Mistral** | ✅ Funciona | 200 | — |
+| Groq | ❌ | 403 | HostGator bloquea IP |
+| Gemini | ❌ | 429 | Free tier tiene limit: 0 (API no habilitada en Google Cloud) |
+| OpenRouter | ⚠️ | 429 | Rate limit temporal upstream (retry_after: 3s) |
+| DeepSeek | ❌ | 402 | Sin créditos en cuenta |
+| Cloudflare | ⏭️ | — | Sin API key |
+| HuggingFace | ⏭️ | — | Sin API key |
+| Ollama | ⏭️ | — | No disponible en server |
 
-### 2. Fix Environment Transbank
-- Se corrigió el mapping de environment en `TransbankService.php`
-- El SDK espera `"TEST"` pero `.env` tenía `"integration"`
-- Se agregó mapeo correcto: `integration` → `Options::ENVIRONMENT_INTEGRATION`
+**Default provider cambiado a `mistral`** en `config/ai.php`.
 
-### 2. Fix TransbankService commitTransaction
-- Se corrigió error fatal en `getCardDetail()->getCardNumber()`
-- `getCardDetail()` retorna un array PHP, no un objeto
-- Se cambió a `$response->getCardDetail()` directamente
+### Acciones pendientes para habilitar más providers:
+1. **Gemini**: Habilitar "Generative Language API" en Google Cloud Console
+2. **OpenRouter**: Reintentar (rate limit temporal de 3s) o probar otros modelos free
+3. **DeepSeek**: Recargar créditos en la cuenta
+4. **Groq**: No funciona desde hosting compartido (HostGator bloquea IPs)
 
-### 3. Fix PaymentController catch blocks
-- Se cambió `catch (\Exception $e)` por `catch (\Throwable $e)`
-- PHP 8.x distingue entre Exception y Error
-- Esto captura errores fatales del SDK
+---
 
-### 4. Fix Transbank environment en producción
-- El `.env` de producción tenía `TRANSBANK_ENV=production` con credenciales sandbox
-- Se cambió a `TRANSBANK_ENV=integration`
+## Cambios Realizados Hoy (2026-07-01)
 
-### 5. Segunda validación de Transbank
-- Se completó el formulario de validación por segunda vez
-- Todas las pruebas pasaron correctamente:
-  - ✅ Crédito aprobada sin cuotas
-  - ✅ Crédito rechazada sin cuotas
-  - ✅ Crédito aprobada con cuotas
-  - ✅ Débito/prepago aprobada
-  - ✅ Débito/prepago rechazada
-  - ✅ Transacción cancelada por usuario
-- Logo ajustado a 130x59px
-- Enviado a validación — esperando API Key productiva (24h hábiles)
+### 1. Error Handling en todos los Providers
+- Todos los providers ahora lanzan `RuntimeException` con mensajes claros
+- Antes devolvían contenido vacío silenciosamente
+- ChatInterface ya captura `\Exception` y muestra el error al usuario
+
+### 2. Logging detallado en providers
+- Cada provider ahora loguea: URL, modelo, HTTP status, elapsed_ms, response_body
+- Logs en `storage/logs/laravel.log`
+- Filtrar con: `tail -200 storage/logs/laravel.log | grep "API response"`
+
+### 3. Comando `php artisan test:providers`
+- Testea cada proveedor con su primer modelo
+- Muestra ✅/❌/⏭️ por provider
+- Guarda logs detallados para debugging
+
+### 4. Eliminar conversaciones desde el historial
+- Botón de papelera al hover en cada conversación
+- Modal de confirmación con AlpineJS
+- Soft delete (no se borran permanentemente)
+- Listener `conversationDeleted` recarga la lista automáticamente
+
+### 5. Default provider cambiado a Mistral
+- `config/ai.php`: default era `groq`, ahora es `mistral`
+- Mistral es el único que funciona actualmente desde HostGator
+
+### 6. Assets compilados en repo
+- `.gitignore` modificado para incluir `public/build/`
+- Necesario porque el server no tiene Node.js
 
 ---
 
@@ -55,226 +70,57 @@ Se han implementado funcionalidades clave para la plataforma SaaS de IA **CarpIA
 
 | Archivo | Acción | Descripción |
 |---------|--------|-------------|
-| `app/Services/TransbankService.php` | Modificado | Fix environment mapping + commitTransaction card_detail |
-| `app/Http/Controllers/PaymentController.php` | Modificado | catch \Throwable en testReturn y return |
-| `integracion_lista.md` | Creado | Documentación completa de integración Transbank |
+| `app/AI/Providers/GroqProvider.php` | Modificado | Error handling + logging |
+| `app/AI/Providers/GeminiProvider.php` | Modificado | Error handling + logging |
+| `app/AI/Providers/OpenRouterProvider.php` | Modificado | Error handling + logging |
+| `app/AI/Providers/DeepSeekProvider.php` | Modificado | Error handling + logging |
+| `app/AI/Providers/MistralProvider.php` | Modificado | Error handling + logging |
+| `app/AI/Providers/CloudflareProvider.php` | Modificado | Error handling |
+| `app/AI/Providers/HuggingFaceProvider.php` | Modificado | Error handling |
+| `app/Console/Commands/TestProviders.php` | Creado | Comando de testing |
+| `app/Livewire/Sidebar/ConversationList.php` | Modificado | deleteConversation() |
+| `resources/views/livewire/sidebar/conversation-list.blade.php` | Modificado | Botón eliminar + modal |
+| `config/ai.php` | Modificado | Default provider → mistral |
+| `.gitignore` | Modificado | Incluir public/build |
 
 ---
 
-## Para Cuando Llegue la API Key Productiva
+## Transbank Webpay Plus (Production)
 
-### 1. Actualizar `.env` en producción ✅ LISTO
-```
-TRANSBANK_ENV=production
-WEBPAY_KEY=597053087507
-WEBPAY_SECRET=2318ba94-6726-446e-a202-cbd826c334ef
-```
-
-### 2. Limpiar caché
-```bash
-cd ~/carpia.cl && php artisan config:clear && php artisan cache:clear
-```
-
-### 3. Transacción de prueba en producción
-- Transbank pide al menos una transacción real de $50 CLP para validar
-- Usar tarjeta real (crédito o débito)
-- Si es exitosa, el sitio queda habilitado para cobros reales
-
----
-
----
-
-## Cambios Realizados Hoy (2026-06-29)
-
-### 1. Login solo con Google
-- Se eliminó el registro/login tradicional con email y contraseña
-- Ahora los usuarios solo pueden autenticarse con Google OAuth
-- Se actualizó la vista `auth/login.blade.php` con botón de Google prominente
-- Se mantuvo la funcionalidad de Laravel Sanctum para sesiones
-
-### 2. Botón Comenzar en home
-- Se agregó botón "Comenzar" en la página de bienvenida (`welcome.blade.php`)
-- El botón redirige al dashboard o al chat si el usuario ya está autenticado
-- Mejora el flujo de onboarding para nuevos usuarios
-
-### 3. Ruta Dashboard
-- Se creó ruta `/dashboard` que muestra una vista resumen para el usuario
-- Incluye acceso rápido al chat, información de plan actual y uso de créditos
-- Se protegió con middleware `auth`
-
-### 4. Middleware CheckSubscription
-- Se creó middleware `CheckSubscription` para verificar estado de suscripción
-- Si el usuario no tiene plan activo, se redirige a pantalla de suscripción
-- Se aplicó a rutas del chat para limitar acceso según plan
-
-### 5. Pantalla de suscripción en el chat
-- Se creó componente Livewire `SubscriptionWall` que se muestra cuando:
-  - Usuario no tiene suscripción activa
-  - Usuario excedió límites de su plan
-- Muestra planes disponibles y opción de upgrade
-- Se integra en `ChatInterface` antes de permitir enviar mensajes
-
-### 6. Fix manejo errores GroqProvider
-- Se corrigió el manejo de excepciones en `GroqProvider.php`
-- Ahora captura errores de rate limit, autenticación y timeouts
-- Se mejoró el mensaje de error para el usuario (no expone detalles técnicos)
-- Se agregó retry automático en errores temporales
-
-### 7. Plan premium $1.990 CLP
-- Se actualizó el plan Premium con precio de **$1.990 CLP/mes**
-- Incluye 500.000 tokens mensuales
-- Acceso a modelos premium (GPT-4o, Claude, Gemini Pro)
-- Se actualizó `PlanSeeder` y migración existente
-
-### 8. Códigos promocionales funcionando
-- Se implementó sistema de códigos promo con:
-  - Tabla `promo_codes` (code, discount_percent, valid_until, max_uses)
-  - Tabla `promo_code_usages` para tracking de usos
-  - Servicio `PromoCodeService` con validación y aplicación
-  - Componente Livewire `RedeemPromoCode` en settings
-- Los códigos pueden dar: descuento porcentual, créditos gratis, o días gratis de premium
-- Se crearon códigos de prueba: `CARPIA2026`, `BIENVENIDA100`
-
-### 9. Compartir para obtener 24h gratis (DESHABILITADO)
-- Se creó componente Livewire `ShareForAccess` con botones para X, Facebook y WhatsApp
-- Se creó vista `share-for-access.blade.php` con botones compactos en fila
-- Se creó migración `used_share_trial` en tabla users para control anti-abuso
-- **Estado actual:** Los archivos existen pero el componente NO se muestra en la UI
-- **Para activar:** Agregar `<livewire:chat.share-for-access />` en `chat-interface.blade.php`
-
-### 10. Integración Transbank Webpay Plus
-- Se instaló `transbank/transbank-sdk:^5.0` (SDK oficial de Transbank)
-- Se creó `config/transbank.php` con configuración de producción
-- Se creó `app/Services/TransbankService.php` - Wrapper del SDK (create + commit)
-- Se creó `app/Http/Controllers/PaymentController.php` - Controlador de checkout con método `direct`
-- Se creó `app/Livewire/Chat/SubscriptionWall.php` - Componente con botón de pago
-- Se creó `resources/views/livewire/chat/subscription-wall.blade.php` - UI del muro
-- Se creó `resources/views/checkout/redirect.blade.php` - Formulario auto-submit a Webpay
-- Se agregaron rutas `/checkout/direct` (GET) y `/checkout/return` (GET) en `routes/web.php`
-- Se verificó autoloader de Composer (namespace `Transbank\` faltaba, se reinstaló el SDK)
-- Se corrigió buy_order: máximo 26 caracteres (formato `CARPIA` + ULID truncado)
-- Se corrigió config: `api_key` lee de `WEBPAY_SECRET`, `commerce_code` lee de `WEBPAY_KEY`
-- Botón verde "Obtener Suscripción" en dashboard lleva directo a `/checkout/direct`
-- **Sandbox probado:** Webpay carga correctamente, formulario de tarjeta funciona
-- **Producción:** Pendiente API Key real de Transbank (credenciales sandbox no sirven para cobros reales)
-
----
-
-## Archivos Modificados/Creados Hoy
-
-| Archivo | Acción | Descripción |
-|---------|--------|-------------|
-| `app/Http/Middleware/CheckSubscription.php` | Creado | Verifica suscripción activa |
-| `app/Livewire/Chat/SubscriptionWall.php` | Creado | Pantalla de suscripción en chat |
-| `app/Livewire/Chat/ShareForAccess.php` | Creado | Sistema share para 24h gratis (deshabilitado) |
-| `app/Livewire/Settings/RedeemPromoCode.php` | Creado | Canje de códigos promo |
-| `app/Services/PromoCodeService.php` | Creado | Lógica de códigos promocionales |
-| `app/Models/PromoCode.php` | Creado | Modelo de código promo |
-| `app/Models/PromoCodeUsage.php` | Creado | Tracking de usos |
-| `app/Models/User.php` | Modificado | Agregado `used_share_trial` a fillable y casts |
-| `database/migrations/xxxx_create_promo_codes_table.php` | Creado | Migración tabla códigos |
-| `database/migrations/xxxx_create_promo_code_usages_table.php` | Creado | Migración tracking usos |
-| `database/migrations/2026_06_29_000000_add_used_share_trial_to_users_table.php` | Creado | Campo control share trial |
-| `database/seeders/PromoCodeSeeder.php` | Creado | Códigos de prueba |
-| `resources/views/auth/login.blade.php` | Modificado | Login solo Google |
-| `resources/views/welcome.blade.php` | Modificado | Botón Comenzar |
-| `resources/views/dashboard.blade.php` | Creado | Vista dashboard |
-| `resources/views/livewire/chat/subscription-wall.blade.php` | Creado | Vista suscripción |
-| `resources/views/livewire/chat/share-for-access.blade.php` | Creado | Vista share buttons (deshabilitado) |
-| `resources/views/livewire/settings/redeem-promo-code.blade.php` | Creado | Vista canje código |
-| `app/AI/Providers/GroqProvider.php` | Modificado | Fix manejo errores |
-| `database/seeders/PlanSeeder.php` | Modificado | Plan Premium $1.990 |
-| `routes/web.php` | Modificado | Rutas dashboard + checkout |
-| `bootstrap/app.php` | Modificado | Registro middleware |
-| `config/transbank.php` | Creado | Configuración Transbank |
-| `app/Services/TransbankService.php` | Creado | Wrapper SDK Transbank |
-| `app/Http/Controllers/PaymentController.php` | Creado | Controlador checkout (create + return + direct) |
-| `app/Livewire/Chat/SubscriptionWall.php` | Modificado | Agregado botón Webpay |
-| `resources/views/livewire/chat/subscription-wall.blade.php` | Modificado | UI con planes y pago |
-| `resources/views/checkout/redirect.blade.php` | Creado | Auto-submit a Webpay |
-| `resources/views/subscription.blade.php` | Modificado | Botón verde a Webpay directo |
-| `resources/views/planes.blade.php` | Modificado | Precio $1.990, botón "Comenzar" |
-| `resources/views/livewire/chat/chat-interface.blade.php` | Modificado | Botón verde "Obtener Suscripción" funcional |
-| `.env` | Modificado | Credenciales Transbank |
-
----
-
-## Para Activar "Compartir para 24h gratis"
-
-Cuando se quiera habilitar, solo ejecutar:
-
-```bash
-# 1. Ejecutar migración pendiente
-php artisan migrate
-
-# 2. Agregar componente en chat-interface.blade.php
-# Después del formulario de código promo, agregar:
-<livewire:chat.share-for-access />
-```
+- **Commerce Code:** `597053087507`
+- **API Key:** `2318ba94-6726-446e-a202-cbd826c334ef`
+- **Status:** Validado en sandbox, credenciales productivas configuradas
+- **URL retorno:** `https://carpia.cl/checkout/return`
+- **SDK:** `transbank/transbank-sdk:^5.0`
 
 ---
 
 ## Próximos Pasos
 
-### URGENTE - Integración Transbank
-- [x] Instalar SDK `transbank/transbank-sdk:^5.0`
-- [x] Crear `TransbankService` wrapper del SDK
-- [x] Crear `PaymentController` con create + return + direct
-- [x] Crear `SubscriptionWall` con botón de pago
-- [x] Agregar ruta `/checkout/direct` (GET directo a Webpay)
-- [x] Configurar `.env` con credenciales sandbox
-- [x] Fix autoloader de Composer (namespace Transbank no se registraba)
-- [x] Fix buy_order maxlength (max 26 caracteres)
-- [x] Fix config (credenciales invertidas api_key/commerce_code)
-- [x] Botón verde "Obtener Suscripción" funcional en dashboard
-- [x] Sandbox probado: Webpay carga, formulario funciona
-- [x] **Obtener API Key de Transbank** ✅ (2026-06-30)
-- [ ] **Actualizar `WEBPAY_KEY` y `WEBPAY_SECRET` en `.env` producción** ← ESTE PASO
-- [ ] **Cambiar `TRANSBANK_ENV=production` en `.env` producción**
-- [ ] **Probar flujo completo de pago en producción ($50 CLP)**
-- [ ] Configurar URL de retorno en portal de Transbank
+### IA Providers
+- [ ] Habilitar Generative Language API en Google Cloud Console (Gemini)
+- [ ] Probar OpenRouter con retry o modelos diferentes
+- [ ] Recargar créditos DeepSeek (opcional)
+- [ ] Evaluar si Mistral free tier es suficiente para producción
 
 ### Pendientes
-- [ ] Agregar emails de bienvenida y confirmación de suscripción
-- [ ] Dashboard de administración: ver códigos promo usados
-- [ ] Sistema de referidos (código único por usuario)
+- [ ] Transacción de prueba $50 CLP en producción Transbank
+- [ ] Agregar emails de bienvenida
+- [ ] Dashboard de administración
+- [ ] Sistema de referidos
 - [ ] Notificaciones de expiración de plan
-- [ ] Testing completo del flujo de suscripción
-- [ ] Crear redes sociales de CarpIA (X, Facebook, WhatsApp)
-- [ ] Activar funcionalidad de share cuando las redes estén listas
 
 ---
 
-## Estado de la Base de Datos
+## Comandos Útiles
 
 ```bash
-# Para sincronizar cambios de hoy:
-php artisan migrate:fresh --seed
+# Test providers
+php artisan test:providers
 
-# Para probar códigos promo:
-# En la BD inserts: CARPIA2026 (20% dto), BIENVENIDA100 (100% gratis 7 días)
+# Ver logs de providers
+tail -200 storage/logs/laravel.log | grep "API response"
+
+# Limpiar caché
+php artisan config:clear && php artisan cache:clear && php artisan route:clear
 ```
-
----
-
-## Notas Técnicas
-
-- El middleware `CheckSubscription` se registra en `bootstrap/app.php` como `check.subscription`
-- Los códigos promo validan: uso máximo, fecha de expiración, y si ya fue usado por el usuario
-- GroqProvider ahora retorna `AIResponseDTO` incluso en errores con mensaje amigable
-- El precio del plan Premium ($1.990 CLP) está en `plans` table, no hardcodeado
-- El componente `ShareForAccess` verifica `used_share_trial` para garantizar uso único
-- Los links de sharing usan URLs oficiales de cada red (no necesitan cuentas de CarpIA)
-
-### Transbank Webpay Plus
-- **Código de comercio producción:** 597053087507
-- **API Key producción:** `2318ba94-6726-446e-a202-cbd826c334ef` ✅
-- **URL retorno producción:** `https://carpia.cl/checkout/return`
-- **SDK instalado:** `transbank/transbank-sdk:^5.0`
-- **Flujo:** GET /checkout/direct → Redirect Webpay → GET /checkout/return → Confirmar
-- **Seguridad:** Nunca se guardan datos de tarjeta, todo maneja Transbank
-- **Documentación:** https://transbankdevelopers.cl/documentacion/webpay-plus
-- **Credenciales sandbox (testing):** commerce `597055555532`, key `579B532A...`
-- **Tarjetas de prueba:** Visa `4051885600446623`, Mastercard `5186059559590568`
-- **Auth sandbox:** RUT `11.111.111-1`, clave `123`
-- **Notas:** buy_order truncado a 26 chars, config lee WEBPAY_SECRET como api_key y WEBPAY_KEY como commerce_code
