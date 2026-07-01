@@ -23,16 +23,18 @@ class ModelSelector extends Component
         $manager = app(AIManager::class);
         $activeProviders = $manager->getActiveProviders();
 
-        $priorityOrder = ['groq', 'mistral', 'openrouter', 'gemini', 'deepseek', 'cloudflare', 'huggingface', 'ollama'];
+        $excludedProviders = ['openrouter', 'gemini', 'deepseek'];
+
+        $priorityOrder = ['groq', 'mistral', 'cloudflare', 'huggingface', 'ollama'];
 
         $sortedProviders = [];
         foreach ($priorityOrder as $slug) {
-            if (isset($activeProviders[$slug])) {
+            if (isset($activeProviders[$slug]) && !in_array($slug, $excludedProviders)) {
                 $sortedProviders[$slug] = $activeProviders[$slug];
             }
         }
         foreach ($activeProviders as $slug => $provider) {
-            if (!isset($sortedProviders[$slug])) {
+            if (!isset($sortedProviders[$slug]) && !in_array($slug, $excludedProviders)) {
                 $sortedProviders[$slug] = $provider;
             }
         }
