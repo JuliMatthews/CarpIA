@@ -6,6 +6,7 @@ use App\AI\Contracts\AIProvider;
 use App\DTOs\AIResponseDTO;
 use Generator;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class MistralProvider implements AIProvider
@@ -15,6 +16,7 @@ class MistralProvider implements AIProvider
     public function sendMessage(array $messages, array $options = []): AIResponseDTO
     {
         $start = microtime(true);
+        $model = $options['model'] ?? 'mistral-small-latest';
 
         $apiKey = config('ai.providers.mistral.api_key');
 
@@ -22,10 +24,12 @@ class MistralProvider implements AIProvider
             throw new RuntimeException('Mistral API key no configurada. Agrega MISTRAL_API_KEY en tu .env');
         }
 
+        $url = "{$this->baseUrl}/chat/completions";
+
         $response = Http::withToken($apiKey)
             ->timeout(30)
-            ->post("{$this->baseUrl}/chat/completions", [
-                'model' => $options['model'] ?? 'mistral-small-latest',
+            ->post($url, [
+                'model' => $model,
                 'messages' => $messages,
                 'temperature' => $options['temperature'] ?? 0.7,
                 'max_tokens' => $options['max_tokens'] ?? 2048,
@@ -34,18 +38,26 @@ class MistralProvider implements AIProvider
         $data = $response->json();
         $elapsed = (int) ((microtime(true) - $start) * 1000);
 
+        Log::info('Mistral API response', [
+            'url' => $url,
+            'model' => $model,
+            'status' => $response->status(),
+            'elapsed_ms' => $elapsed,
+            'response_body' => substr(json_encode($data), 0, 500),
+        ]);
+
         if (isset($data['error'])) {
             $message = $data['error']['message'] ?? 'Error desconocido de Mistral';
             throw new RuntimeException("Mistral API error: {$message}");
         }
 
         if (!$response->successful() || !isset($data['choices'][0]['message']['content'])) {
-            throw new RuntimeException("Mistral devolvió respuesta inválida: " . substr(json_encode($data), 0, 200));
+            throw new RuntimeException("Mistral devolvió respuesta inválida (HTTP {$response->status()}): " . substr(json_encode($data), 0, 300));
         }
 
         return new AIResponseDTO(
             content: $data['choices'][0]['message']['content'],
-            model: $data['model'] ?? $options['model'] ?? 'unknown',
+            model: $data['model'] ?? $model,
             provider: 'mistral',
             promptTokens: $data['usage']['prompt_tokens'] ?? null,
             completionTokens: $data['usage']['completion_tokens'] ?? null,

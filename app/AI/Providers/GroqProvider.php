@@ -6,6 +6,7 @@ use App\AI\Contracts\AIProvider;
 use App\DTOs\AIResponseDTO;
 use Generator;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class GroqProvider implements AIProvider
@@ -15,6 +16,7 @@ class GroqProvider implements AIProvider
     public function sendMessage(array $messages, array $options = []): AIResponseDTO
     {
         $start = microtime(true);
+        $model = $options['model'] ?? 'llama-3.3-70b-versatile';
 
         $apiKey = config('ai.providers.groq.api_key');
 
@@ -22,10 +24,12 @@ class GroqProvider implements AIProvider
             throw new RuntimeException('Groq API key no configurada. Agrega GROQ_API_KEY en tu .env');
         }
 
+        $url = "{$this->baseUrl}/chat/completions";
+
         $response = Http::withToken($apiKey)
             ->timeout(30)
-            ->post("{$this->baseUrl}/chat/completions", [
-                'model' => $options['model'] ?? 'llama-3.3-70b-versatile',
+            ->post($url, [
+                'model' => $model,
                 'messages' => $messages,
                 'temperature' => $options['temperature'] ?? 0.7,
                 'max_tokens' => $options['max_tokens'] ?? 2048,
@@ -34,6 +38,14 @@ class GroqProvider implements AIProvider
         $data = $response->json();
         $elapsed = (int) ((microtime(true) - $start) * 1000);
 
+        Log::info('Groq API response', [
+            'url' => $url,
+            'model' => $model,
+            'status' => $response->status(),
+            'elapsed_ms' => $elapsed,
+            'response_body' => substr(json_encode($data), 0, 500),
+        ]);
+
         if (isset($data['error'])) {
             $message = $data['error']['message'] ?? 'Error desconocido de Groq';
             $code = $data['error']['code'] ?? 500;
@@ -41,12 +53,12 @@ class GroqProvider implements AIProvider
         }
 
         if (!$response->successful() || !isset($data['choices'][0]['message']['content'])) {
-            throw new RuntimeException("Groq devolvió respuesta inválida: " . substr(json_encode($data), 0, 200));
+            throw new RuntimeException("Groq devolvió respuesta inválida (HTTP {$response->status()}): " . substr(json_encode($data), 0, 300));
         }
 
         return new AIResponseDTO(
             content: $data['choices'][0]['message']['content'],
-            model: $data['model'] ?? $options['model'] ?? 'unknown',
+            model: $data['model'] ?? $model,
             provider: 'groq',
             promptTokens: $data['usage']['prompt_tokens'] ?? null,
             completionTokens: $data['usage']['completion_tokens'] ?? null,

@@ -6,6 +6,7 @@ use App\AI\Contracts\AIProvider;
 use App\DTOs\AIResponseDTO;
 use Generator;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class GeminiProvider implements AIProvider
@@ -41,14 +42,20 @@ class GeminiProvider implements AIProvider
             throw new RuntimeException('Gemini API key no configurada. Agrega GEMINI_API_KEY en tu .env');
         }
 
-        $response = Http::timeout(30)
-            ->post(
-                "{$this->baseUrl}/models/{$model}:generateContent?key={$apiKey}",
-                $payload
-            );
+        $url = "{$this->baseUrl}/models/{$model}:generateContent?key={$apiKey}";
+
+        $response = Http::timeout(30)->post($url, $payload);
 
         $data = $response->json();
         $elapsed = (int) ((microtime(true) - $start) * 1000);
+
+        Log::info('Gemini API response', [
+            'url' => "{$this->baseUrl}/models/{$model}:generateContent",
+            'model' => $model,
+            'status' => $response->status(),
+            'elapsed_ms' => $elapsed,
+            'response_body' => substr(json_encode($data), 0, 500),
+        ]);
 
         if (isset($data['error'])) {
             $code = $data['error']['code'] ?? 500;

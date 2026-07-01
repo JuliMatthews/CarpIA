@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\AI\AIManager;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 
 class TestProviders extends Command
 {
@@ -53,6 +54,13 @@ class TestProviders extends Command
                 }
             } catch (\Exception $e) {
                 $errorMsg = $e->getMessage();
+
+                Log::error("test:providers failed for {$name}", [
+                    'provider' => $slug,
+                    'model' => $testModel,
+                    'error' => $errorMsg,
+                ]);
+
                 if (strlen($errorMsg) > 60) {
                     $errorMsg = mb_substr($errorMsg, 0, 57) . '...';
                 }
@@ -63,6 +71,10 @@ class TestProviders extends Command
 
         $this->newLine();
         $this->info("Resumen: {$working} funcionando, {$failed} fallando, {$skipped} sin key/disponibles");
+        $this->newLine();
+
+        $this->info('Logs detallados guardados en storage/logs/laravel.log');
+        $this->info('Para verlos: tail -100 storage/logs/laravel.log | grep "API response"');
         $this->newLine();
 
         return $working > 0 ? self::SUCCESS : self::FAILURE;

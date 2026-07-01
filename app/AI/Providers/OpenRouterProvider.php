@@ -6,6 +6,7 @@ use App\AI\Contracts\AIProvider;
 use App\DTOs\AIResponseDTO;
 use Generator;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class OpenRouterProvider implements AIProvider
@@ -15,6 +16,7 @@ class OpenRouterProvider implements AIProvider
     public function sendMessage(array $messages, array $options = []): AIResponseDTO
     {
         $start = microtime(true);
+        $model = $options['model'] ?? 'meta-llama/llama-3.3-70b-instruct:free';
 
         $apiKey = config('ai.providers.openrouter.api_key');
 
@@ -22,14 +24,16 @@ class OpenRouterProvider implements AIProvider
             throw new RuntimeException('OpenRouter API key no configurada. Agrega OPENROUTER_API_KEY en tu .env');
         }
 
+        $url = "{$this->baseUrl}/chat/completions";
+
         $response = Http::withHeaders([
                 'Authorization' => "Bearer {$apiKey}",
                 'HTTP-Referer' => config('app.url'),
                 'X-Title' => 'CarpIA',
             ])
             ->timeout(30)
-            ->post("{$this->baseUrl}/chat/completions", [
-                'model' => $options['model'] ?? 'meta-llama/llama-3.3-70b-instruct:free',
+            ->post($url, [
+                'model' => $model,
                 'messages' => $messages,
                 'temperature' => $options['temperature'] ?? 0.7,
                 'max_tokens' => $options['max_tokens'] ?? 2048,
@@ -38,18 +42,26 @@ class OpenRouterProvider implements AIProvider
         $data = $response->json();
         $elapsed = (int) ((microtime(true) - $start) * 1000);
 
+        Log::info('OpenRouter API response', [
+            'url' => $url,
+            'model' => $model,
+            'status' => $response->status(),
+            'elapsed_ms' => $elapsed,
+            'response_body' => substr(json_encode($data), 0, 500),
+        ]);
+
         if (isset($data['error'])) {
             $message = $data['error']['message'] ?? 'Error desconocido de OpenRouter';
             throw new RuntimeException("OpenRouter API error: {$message}");
         }
 
         if (!$response->successful() || !isset($data['choices'][0]['message']['content'])) {
-            throw new RuntimeException("OpenRouter devolvió respuesta inválida: " . substr(json_encode($data), 0, 200));
+            throw new RuntimeException("OpenRouter devolvió respuesta inválida (HTTP {$response->status()}): " . substr(json_encode($data), 0, 300));
         }
 
         return new AIResponseDTO(
             content: $data['choices'][0]['message']['content'],
-            model: $data['model'] ?? $options['model'] ?? 'unknown',
+            model: $data['model'] ?? $model,
             provider: 'openrouter',
             promptTokens: $data['usage']['prompt_tokens'] ?? null,
             completionTokens: $data['usage']['completion_tokens'] ?? null,
