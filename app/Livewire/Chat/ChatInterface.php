@@ -207,6 +207,13 @@ class ChatInterface extends Component
             $this->dispatch('scrollToBottom');
 
         } catch (\Exception $e) {
+            \Log::error('ChatInterface: Exception caught', [
+                'exception_class' => get_class($e),
+                'message' => $e->getMessage(),
+                'provider' => $model->provider->slug ?? 'unknown',
+                'model' => $model->slug ?? 'unknown',
+            ]);
+
             $userMessage = AIErrorHandler::handleWithLog(
                 $e,
                 $model->provider->slug ?? 'unknown',

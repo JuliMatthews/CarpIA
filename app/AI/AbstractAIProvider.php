@@ -14,6 +14,7 @@ use App\Exceptions\AI\AIProviderException;
 use App\Exceptions\AI\AIInsufficientBalanceException;
 use Generator;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -54,14 +55,30 @@ abstract class AbstractAIProvider implements AIProvider
                 ->retry($this->retries, 1000)
                 ->post($url, $payload);
 
-            $data = $response->json();
             $elapsed = (int) ((microtime(true) - $start) * 1000);
 
+            if ($response->failed()) {
+                $data = $response->json();
+                $this->logResponse($url, $model, $response->status(), $elapsed, $data ?? [], $options['user_id'] ?? null);
+                $this->handleError($response, $data ?? []);
+            }
+
+            $data = $response->json();
             $this->logResponse($url, $model, $response->status(), $elapsed, $data, $options['user_id'] ?? null);
+
+            return $this->parseResponse($data, $model);
+
+        } catch (RequestException $e) {
+            $elapsed = (int) ((microtime(true) - $start) * 1000);
+            $response = $e->response;
+            $statusCode = $response?->status() ?? 0;
+            $data = $response?->json() ?? [];
+
+            $this->logError($url, $model, $statusCode, $elapsed, $e, $options['user_id'] ?? null);
 
             $this->handleError($response, $data);
 
-            return $this->parseResponse($data, $model);
+            throw AIProviderException::provider($this->providerName, $e->getMessage(), $e);
 
         } catch (ConnectionException $e) {
             $elapsed = (int) ((microtime(true) - $start) * 1000);
@@ -120,6 +137,15 @@ abstract class AbstractAIProvider implements AIProvider
                     yield $content;
                 }
             }
+
+        } catch (RequestException $e) {
+            $response = $e->response;
+            $statusCode = $response?->status() ?? 0;
+            $data = $response?->json() ?? [];
+
+            $this->handleError($response, $data);
+
+            throw AIProviderException::provider($this->providerName, $e->getMessage(), $e);
 
         } catch (ConnectionException $e) {
             throw AIConnectionException::provider($this->providerName, $e->getMessage(), $e);

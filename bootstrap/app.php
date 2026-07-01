@@ -21,5 +21,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->shouldRenderApiResponse(function (\Throwable $e) {
+            if (request()->expectsJson() || request()->is('livewire/*')) {
+                return true;
+            }
+            return false;
+        });
     })->create();
