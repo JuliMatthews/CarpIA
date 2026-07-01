@@ -56,44 +56,33 @@ abstract class AbstractAIProvider implements AIProvider
                 ->post($url, $payload);
 
             $elapsed = (int) ((microtime(true) - $start) * 1000);
+            $statusCode = $response->status();
+            $data = $response->json() ?? [];
+
+            $this->logResponse($url, $model, $statusCode, $elapsed, $data, $options['user_id'] ?? null);
 
             if ($response->failed()) {
-                $data = $response->json();
-                $this->logResponse($url, $model, $response->status(), $elapsed, $data ?? [], $options['user_id'] ?? null);
-                $this->handleError($response, $data ?? []);
+                $this->throwByStatus($statusCode, $data['error']['message'] ?? $data['message'] ?? "HTTP {$statusCode}", $statusCode);
             }
 
-            $data = $response->json();
-            $this->logResponse($url, $model, $response->status(), $elapsed, $data, $options['user_id'] ?? null);
-
             return $this->parseResponse($data, $model);
-
-        } catch (RequestException $e) {
-            $elapsed = (int) ((microtime(true) - $start) * 1000);
-            $response = $e->response;
-            $statusCode = $response?->status() ?? 0;
-            $data = $response?->json() ?? [];
-
-            $this->logError($url, $model, $statusCode, $elapsed, $e, $options['user_id'] ?? null);
-
-            $this->handleError($response, $data);
-
-            throw AIProviderException::provider($this->providerName, $e->getMessage(), $e);
-
-        } catch (ConnectionException $e) {
-            $elapsed = (int) ((microtime(true) - $start) * 1000);
-            $this->logError($url, $model, 0, $elapsed, $e, $options['user_id'] ?? null);
-            throw AIConnectionException::provider($this->providerName, $e->getMessage(), $e);
 
         } catch (AIException $e) {
             $elapsed = (int) ((microtime(true) - $start) * 1000);
             $this->logError($url, $model, 0, $elapsed, $e, $options['user_id'] ?? null);
             throw $e;
 
-        } catch (Throwable $e) {
+        } catch (\Exception $e) {
             $elapsed = (int) ((microtime(true) - $start) * 1000);
             $this->logError($url, $model, 0, $elapsed, $e, $options['user_id'] ?? null);
-            throw AIProviderException::provider($this->providerName, $e->getMessage(), $e);
+
+            $message = $e->getMessage();
+
+            if (str_contains($message, 'cURL error') || str_contains($message, 'Connection')) {
+                throw AIConnectionException::provider($this->providerName, $message, $e);
+            }
+
+            throw AIProviderException::provider($this->providerName, $message, $e);
         }
     }
 
@@ -114,6 +103,12 @@ abstract class AbstractAIProvider implements AIProvider
                 ->timeout($this->streamTimeout)
                 ->connectTimeout($this->connectTimeout)
                 ->post($url, $payload);
+
+            if ($response->failed()) {
+                $statusCode = $response->status();
+                $data = $response->json() ?? [];
+                $this->throwByStatus($statusCode, $data['error']['message'] ?? $data['message'] ?? "HTTP {$statusCode}", $statusCode);
+            }
 
             $body = $response->body();
             $lines = explode("\n", $body);
@@ -138,23 +133,17 @@ abstract class AbstractAIProvider implements AIProvider
                 }
             }
 
-        } catch (RequestException $e) {
-            $response = $e->response;
-            $statusCode = $response?->status() ?? 0;
-            $data = $response?->json() ?? [];
-
-            $this->handleError($response, $data);
-
-            throw AIProviderException::provider($this->providerName, $e->getMessage(), $e);
-
-        } catch (ConnectionException $e) {
-            throw AIConnectionException::provider($this->providerName, $e->getMessage(), $e);
-
         } catch (AIException $e) {
             throw $e;
 
-        } catch (Throwable $e) {
-            throw AIProviderException::provider($this->providerName, $e->getMessage(), $e);
+        } catch (\Exception $e) {
+            $message = $e->getMessage();
+
+            if (str_contains($message, 'cURL error') || str_contains($message, 'Connection')) {
+                throw AIConnectionException::provider($this->providerName, $message, $e);
+            }
+
+            throw AIProviderException::provider($this->providerName, $message, $e);
         }
     }
 
